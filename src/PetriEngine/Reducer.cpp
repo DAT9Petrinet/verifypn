@@ -1675,21 +1675,26 @@ namespace PetriEngine {
     }
 
     bool Reducer::ReducebyRuleM(uint32_t* placeInQuery) {
-        // Unmarked syphon
+        // Maximum Unmarked Syphon removal. Using an overestimation we find a siphon, a set of places,
+        // which will never have more than 0 tokens.
         // Rule 10 from "Structural Reductions Revisited" by Yann Theiry-Mieg
         bool continueReductions = false;
 
-        // Named according to the specification in the paper for ease of implementation, refactor later
+        // The places of siphon S will be removed
         std::unordered_set <uint32_t> S;
+        // Transitions in T can't fire because they consume from a place in S.
         std::unordered_set <uint32_t> T;
 
-        for (uint32_t i=0; i < parent->_places.size(); ++i){
-            if (!parent->_places[i].skip && parent->initialMarking[i] == 0){
+        // Now we find the fixed point of S and T iteratively
+        // Initially S contains all places with 0 tokens and T contains all transitions
+
+        for (uint32_t i=0; i < parent->_places.size(); ++i) {
+            if (!parent->_places[i].skip && parent->initialMarking[i] == 0) {
                 S.insert(i);
             }
         }
-        for (uint32_t i=0; i < parent->_transitions.size(); ++i){
-            if (!parent->_transitions[i].skip){
+        for (uint32_t i=0; i < parent->_transitions.size(); ++i) {
+            if (!parent->_transitions[i].skip) {
                 T.insert(i);
             }
         }
@@ -1700,16 +1705,16 @@ namespace PetriEngine {
         do{
             fixpoint = true;
 
-            // Point 1
+            // Discard transitions from T if they have no producers in S
             for (auto it = T.begin(); it != T.end(); ){
                 out = true;
-                for (Arc postarc : parent->_transitions[(*it)].post){
-                    if (S.find(postarc.place) != S.end()){
+                for (Arc postarc : parent->_transitions[(*it)].post) {
+                    if (S.find(postarc.place) != S.end()) {
                         out = false;
                         break;
                     }
                 }
-                if (out){
+                if (out) {
                     it = T.erase(it);
                     fixpoint = false;
                 } else {
@@ -1717,22 +1722,22 @@ namespace PetriEngine {
                 }
             }
 
-            // Point 2
+            // Discard from T any transition that does not consume from S and discard its postset from S
             for (auto it = T.begin(); it != T.end(); ){
                 out = true;
                 trans = (*it);
-                for (Arc prearc : parent->_transitions[trans].pre){
+                for (Arc prearc : parent->_transitions[trans].pre) {
                     // If there is a non-inhibitor arc from some place in S, this transition can't be removed from T yet.
                     if (!prearc.inhib && S.find(prearc.place) != S.end()){
                         out = false;
                         break;
                     }
                 }
-                if (out){
+                if (out) {
                     it = T.erase(it);
                     fixpoint = false;
                     // Places pointed to by any transition outside T are immediately removed from S
-                    for (Arc postarc : parent->_transitions[trans].post){
+                    for (Arc postarc : parent->_transitions[trans].post) {
                         S.erase(postarc.place);
                     }
                 } else {
@@ -1743,21 +1748,22 @@ namespace PetriEngine {
         } while(!fixpoint && !S.empty());
 
         bool anythingSkipped = false;
-        for (uint32_t place : S){
-            for (uint32_t consumer : parent->_places[place].consumers){
+        // Remove S and any transition consuming from S
+        for (uint32_t place : S) {
+            for (uint32_t consumer : parent->_places[place].consumers) {
                 auto consumertrans = parent->_transitions[consumer];
                 // Avoid skipping already skipped transitions, and Inhibitor arcs don't count here
-                if (!consumertrans.skip && !getInArc(place, consumertrans)->inhib){
+                if (!consumertrans.skip && !getInArc(place, consumertrans)->inhib) {
                     skipTransition(consumer);
                     anythingSkipped = true;
                 }
             }
-            if (placeInQuery[place] == 0){
+            if (placeInQuery[place] == 0) {
                 skipPlace(place);
                 anythingSkipped = true;
             }
         }
-        if(anythingSkipped){
+        if (anythingSkipped) {
             _ruleM++;
             continueReductions = true;
         }
