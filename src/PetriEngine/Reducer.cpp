@@ -181,7 +181,36 @@ namespace PetriEngine {
         pl.producers.clear();
         assert(consistent());
     }
-    
+
+    void Reducer::skipInArc(uint32_t p, uint32_t t)
+    {
+        Place& place = parent->_places[p];
+        Transition& trans = parent->_transitions[t];
+
+        eraseTransition(place.consumers, t);;
+
+        Arc a;
+        a.place = p;
+        auto ait = std::lower_bound(trans.pre.begin(), trans.pre.end(), a);
+        assert(ait != trans.pre.end());
+        trans.pre.erase(ait);
+        assert(consistent());
+    }
+
+    void Reducer::skipOutArc(uint32_t t, uint32_t p)
+    {
+        Place& place = parent->_places[p];
+        Transition& trans = parent->_transitions[t];
+
+        eraseTransition(place.producers, t);;
+
+        Arc a;
+        a.place = p;
+        auto ait = std::lower_bound(trans.post.begin(), trans.post.end(), a);
+        assert(ait != trans.post.end());
+        trans.post.erase(ait);
+        assert(consistent());
+    }
     
     bool Reducer::consistent()
     {
@@ -1838,19 +1867,19 @@ namespace PetriEngine {
                 {
                     if (inArc->weight == outArc->weight)
                     {
-                        skipArc(inArc);
+                        skipInArc(p, cons);
                     }
                     else
                     {
                         inArc->weight -= outArc->weight;
                     }
-                    skipArc(outArc);
+                    skipOutArc(cons, p);
 
                     nonNegative -= 1;
                     continueReductions = true;
                     _ruleN += 1;
 
-                    // TODO Reconstruct trace??
+                    // TODO Reconstruct trace
                 }
             }
 

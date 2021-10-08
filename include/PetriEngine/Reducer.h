@@ -159,6 +159,8 @@ namespace PetriEngine {
         void eraseTransition(std::vector<uint32_t>&, uint32_t);
         void skipTransition(uint32_t);
         void skipPlace(uint32_t);
+        void skipInArc(uint32_t, uint32_t);
+        void skipOutArc(uint32_t, uint32_t);
         std::string newTransName();
         
         bool consistent();
