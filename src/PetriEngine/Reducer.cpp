@@ -187,7 +187,7 @@ namespace PetriEngine {
         Place& place = parent->_places[p];
         Transition& trans = parent->_transitions[t];
 
-        eraseTransition(place.consumers, t);;
+        eraseTransition(place.consumers, t);
 
         Arc a;
         a.place = p;
@@ -202,7 +202,7 @@ namespace PetriEngine {
         Place& place = parent->_places[p];
         Transition& trans = parent->_transitions[t];
 
-        eraseTransition(place.producers, t);;
+        eraseTransition(place.producers, t);
 
         Arc a;
         a.place = p;
