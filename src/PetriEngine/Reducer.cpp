@@ -1804,7 +1804,7 @@ namespace PetriEngine {
         return continueReductions;
     }
 
-    bool Reducer::ReducebyRuleN(uint32_t* placeInQuery) {
+    bool Reducer::ReducebyRuleN(uint32_t* placeInQuery, bool applyF) {
         // Redundant arc (and place) removal.
         // If a place p never disables a transition, we can remove its arc to the
         // transitions as long as the effect is maintained.
@@ -1888,7 +1888,7 @@ namespace PetriEngine {
                 }
             }
 
-            if (removePlace && nonNegative == 0 && numberofplaces - _removedPlaces > 1)
+            if (applyF && removePlace && nonNegative == 0 && numberofplaces - _removedPlaces > 1)
             {
                 if(reconstructTrace)
                 {
@@ -1901,6 +1901,7 @@ namespace PetriEngine {
                 }
                 skipPlace(p);
                 continueReductions = true;
+                _ruleF++;
             }
 
         }
@@ -1942,6 +1943,7 @@ namespace PetriEngine {
         this->reconstructTrace = reconstructTrace;
         if(reconstructTrace && enablereduction >= 1 && enablereduction <= 2)
             std::cout << "Rule H disabled when a trace is requested." << std::endl;
+        bool applyF = std::count(reduction.begin(), reduction.end(), 5);
         if (enablereduction == 2) { // for k-boundedness checking only rules A, D and H are applicable
             bool changed = true;
             while (changed && !hasTimedout()) {
@@ -1966,7 +1968,7 @@ namespace PetriEngine {
                         while(ReducebyRuleM(context.getQueryPlaceCount())) changed = true;
                         while(ReducebyRuleE(context.getQueryPlaceCount())) changed = true;
                         while(ReducebyRuleC(context.getQueryPlaceCount())) changed = true;
-                        while(ReducebyRuleN(context.getQueryPlaceCount())) changed = true;
+                        while(ReducebyRuleN(context.getQueryPlaceCount(), applyF)) changed = true;
                         while(ReducebyRuleF(context.getQueryPlaceCount())) changed = true;
                         while(ReducebyRuleL(context.getQueryPlaceCount())) changed = true;
                         if(!next_safe)
@@ -2066,7 +2068,7 @@ namespace PetriEngine {
                             if (ReducebyRuleM(context.getQueryPlaceCount())) changed = true;
                             break;
                         case 13:
-                            if (ReducebyRuleN(context.getQueryPlaceCount())) changed = true;
+                            if (ReducebyRuleN(context.getQueryPlaceCount(), applyF)) changed = true;
                             break;
                     }
 #ifndef NDEBUG

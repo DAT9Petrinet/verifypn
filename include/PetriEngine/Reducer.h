@@ -145,7 +145,7 @@ namespace PetriEngine {
         bool ReducebyRuleK(uint32_t* placeInQuery, bool remove_consumers);
         bool ReducebyRuleL(uint32_t* placeInQuery);
         bool ReducebyRuleM(uint32_t* placeInQuery);
-        bool ReducebyRuleN(uint32_t* placeInQuery);
+        bool ReducebyRuleN(uint32_t* placeInQuery, bool applyF);
 
         std::optional<std::pair<std::vector<bool>, std::vector<bool>>>relevant(const uint32_t* placeInQuery, bool remove_consumers);
         bool remove_irrelevant(const uint32_t* placeInQuery, const std::vector<bool> &tseen, const std::vector<bool> &pseen);
