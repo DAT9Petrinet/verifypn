@@ -1872,13 +1872,13 @@ namespace PetriEngine {
                 {
                     if (inArc->weight == outArc->weight)
                     {
-                        skipInArc(p, cons);
+                        skipOutArc(cons, p);
                     }
                     else
                     {
-                        inArc->weight -= outArc->weight;
+                        outArc->weight -= inArc->weight;
                     }
-                    skipOutArc(cons, p);
+                    skipInArc(p, cons);
 
                     nonNegative -= 1;
                     continueReductions = true;
