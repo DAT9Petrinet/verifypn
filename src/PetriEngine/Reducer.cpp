@@ -1823,6 +1823,8 @@ namespace PetriEngine {
             // Use tflags to mark transitions with negative effect
             _tflags.resize(parent->_transitions.size(), 0);
             std::fill(_tflags.begin(), _tflags.end(), 0);
+
+            // Assume all consumers are disableable and non-negative until proven otherwise. Used to apply F.
             uint32_t disableableNonNegative = place.consumers.size();
 
             uint32_t low = parent->initialMarking[p];
