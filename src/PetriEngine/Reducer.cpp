@@ -876,17 +876,32 @@ namespace PetriEngine {
             if(place.skip) continue;
             if(place.inhib) continue;
             if(place.producers.size() > place.consumers.size()) continue;
-            
-            std::set<uint32_t> notenabled;
+
             bool ok = true;
+            for(uint prod : place.producers)
+            {
+                // Any producer without a matching consumer blocks this rule
+                Transition& t = getTransition(prod);
+                if(getInArc(p, t) == t.pre.end())
+                {
+                    ok = false;
+                    break;
+                }
+            }
+
+            if(!ok) continue;
+
+            std::set<uint32_t> notenabled;
             for(uint cons : place.consumers)
             {
                 Transition& t = getTransition(cons);
                 auto in = getInArc(p, t);
                 if(in->weight <= parent->initialMarking[p])
                 {
+                    // This branch happening even once means notenabled.size() != consumers.size()
                     auto out = getOutArc(t, p);
-                    if(out == t.post.end() || out->place != p || out->weight >= in->weight)
+                    // Only increasing loops are not ok
+                    if(out != t.post.end() && out->weight > in->weight)
                     {
                         ok = false;
                         break;
@@ -900,31 +915,8 @@ namespace PetriEngine {
             
             if(!ok || notenabled.size() == 0) continue;
 
-            for(uint prod : place.producers)
-            {
-                if(notenabled.count(prod) == 0)
-                {
-                    ok = false;
-                    break;
-                }
-                // check that producing arcs originate from transition also 
-                // consuming. If so, we know it will never fire.
-                Transition& t = getTransition(prod);
-                ArcIter it = getInArc(p, t);
-                if(it == t.pre.end())
-                {
-                    ok = false;
-                    break;
-                }
-            }
-            
-            if(!ok) continue;
-
             _ruleE++;
             continueReductions = true;
-          
-            if(placeInQuery[p] == 0) 
-                parent->initialMarking[p] = 0;
             
             bool skipplace = (notenabled.size() == place.consumers.size()) && (placeInQuery[p] == 0);
             for(uint cons : notenabled)
@@ -1502,12 +1494,13 @@ namespace PetriEngine {
         for (std::size_t t = 0; t < parent->numberOfTransitions(); ++t) {
             auto transition = parent->_transitions[t];
             if (!tseen[t] && !transition.skip && !transition.inhib && transition.pre.size() == 1 &&
-                transition.post.size() == 1
-                && transition.pre[0].place == transition.post[0].place) {
+                    // Search for simple self loops outside the relevant area that could be kept to preserve liveness?
+                    transition.post.size() == 1
+                    && transition.pre[0].place == transition.post[0].place) {
                 auto p = transition.pre[0].place;
                 if (!pseen[p] && !parent->_places[p].inhib) {
                     if (parent->initialMarking[p] >= transition.pre[0].weight){
-                        //Mark the initially marked self loop as relevant.
+                        // Mark the initially marked self loop as relevant.
                         tseen[t] = true;
                         pseen[p] = true;
                         reduced |= remove_irrelevant(placeInQuery, tseen, pseen);
@@ -1515,6 +1508,7 @@ namespace PetriEngine {
                         return reduced;
                     }
                     if (transition.pre[0].weight == 1){
+                        // If a single token can enable a self loop, other consumers of that place are irrelevant to liveness
                         for (auto t2 : parent->_places[p].consumers) {
                             auto transition2 = parent->_transitions[t2];
                             if (t != t2 && !tseen[t2] && !transition2.skip) {
@@ -1573,10 +1567,10 @@ namespace PetriEngine {
 
                             if (it != trans.post.end() && it->place == arc.place) {
                                 auto it2 = trans.pre.begin();
-                                // Find the arc from place to trans we know to exist
+                                // Find the arc from place to trans we know to exist because that is how we found trans in the first place
                                 for (; it2 != trans.pre.end(); ++it2)
                                     if (it2->place >= arc.place) break;
-                                // No need for a || it2->place != arc.place condition, as trans was taken from place.consumers in the first place, so it2->place == arc.place always holds here.
+                                // No need for a || it2->place != arc.place condition because we know the loop will always break on it2->place == arc.place
                                 if (it2->inhib || it->weight >= it2->weight) continue;
                             }
                             tseen[pt] = true;
