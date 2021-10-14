@@ -1930,6 +1930,10 @@ namespace PetriEngine {
                 continueReductions = true;
                 _ruleF++;
             }
+            else if (inhibArcs == 0)
+            {
+                place.inhib = false;
+            }
 
         }
         assert(consistent());
