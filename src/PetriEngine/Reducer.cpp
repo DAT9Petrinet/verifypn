@@ -867,6 +867,7 @@ namespace PetriEngine {
     }
     
     bool Reducer::ReducebyRuleE(uint32_t* placeInQuery) {
+        // Rule P is an extension on Rule E
         bool continueReductions = false;
         const size_t numberofplaces = parent->numberOfPlaces();
         for(uint32_t p = 0; p < numberofplaces; ++p)
@@ -874,7 +875,6 @@ namespace PetriEngine {
             if(hasTimedout()) return false;
             Place& place = parent->_places[p];
             if(place.skip) continue;
-            if(place.inhib) continue;
             if(place.producers.size() > place.consumers.size()) continue;
 
             bool ok = true;
@@ -882,7 +882,8 @@ namespace PetriEngine {
             {
                 // Any producer without a matching consumer blocks this rule
                 Transition& t = getTransition(prod);
-                if(getInArc(p, t) == t.pre.end())
+                auto in = getInArc(p, t);
+                if(in == t.pre.end() || in->inhib)
                 {
                     ok = false;
                     break;
@@ -899,12 +900,14 @@ namespace PetriEngine {
                 if(in->weight <= parent->initialMarking[p])
                 {
                     // This branch happening even once means notenabled.size() != consumers.size()
-                    auto out = getOutArc(t, p);
-                    // Only increasing loops are not ok
-                    if(out != t.post.end() && out->weight > in->weight)
-                    {
-                        ok = false;
-                        break;
+                    // We already threw out all cases where in->inhib && out != t.post.end()
+                    if (!in->inhib) {
+                        auto out = getOutArc(t, p);
+                        // Only increasing loops are not ok
+                        if (out != t.post.end() && out->weight > in->weight) {
+                            ok = false;
+                            break;
+                        }
                     }
                 }               
                 else
@@ -913,17 +916,30 @@ namespace PetriEngine {
                 }
             }
             
-            if(!ok || notenabled.size() == 0) continue;
-
-            _ruleE++;
-            continueReductions = true;
+            if(!ok || notenabled.empty()) continue;
             
             bool skipplace = (notenabled.size() == place.consumers.size()) && (placeInQuery[p] == 0);
-            for(uint cons : notenabled)
-                skipTransition(cons);
+            bool E_used, P_used = false;
+            for(uint cons : notenabled) {
+                Transition &t = getTransition(cons);
+                auto in = getInArc(p, t);
+                if (in->inhib) {
+                    skipInArc(p, cons);
+                    P_used = true;
+                } else {
+                    skipTransition(cons);
+                    E_used = true;
+                }
+            }
 
-            if(skipplace)
+            if(skipplace) {
                 skipPlace(p);
+                E_used = true;
+            }
+
+            if (E_used) _ruleE++;
+            if (P_used) _ruleP++;
+            continueReductions = true;
 
         }
         assert(consistent());
@@ -1778,7 +1794,8 @@ namespace PetriEngine {
         bool anythingSkipped = false;
         // Remove S and any transition consuming from S
         for (uint32_t place : S) {
-            for (uint32_t consumer : parent->_places[place].consumers) {
+            auto theplace = parent->_places[place];
+            for (uint32_t consumer : theplace.consumers) {
                 auto consumertrans = parent->_transitions[consumer];
                 // Avoid skipping already skipped transitions, and Inhibitor arcs don't count here
                 if (!consumertrans.skip && !getInArc(place, consumertrans)->inhib) {

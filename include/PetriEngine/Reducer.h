@@ -115,7 +115,9 @@ namespace PetriEngine {
                 << "Applications of rule K: " << _ruleK << "\n"
                 << "Applications of rule L: " << _ruleL << "\n"
                 << "Applications of rule M: " << _ruleM << "\n"
-                << "Applications of rule N: " << _ruleN << std::endl;
+                << "Applications of rule N: " << _ruleN << "\n"
+                << "Applications of rule O: " << _ruleO << "\n"
+                << "Applications of rule P: " << _ruleP << std::endl;
         }
 
         void postFire(std::ostream&, const std::string& transition);
@@ -125,7 +127,7 @@ namespace PetriEngine {
     private:
         size_t _removedTransitions = 0;
         size_t _removedPlaces= 0;
-        size_t _ruleA = 0, _ruleB = 0, _ruleC = 0, _ruleD = 0, _ruleE = 0, _ruleF = 0, _ruleG = 0, _ruleH = 0, _ruleI = 0, _ruleJ = 0, _ruleK = 0, _ruleL = 0, _ruleM = 0, _ruleN = 0;
+        size_t _ruleA = 0, _ruleB = 0, _ruleC = 0, _ruleD = 0, _ruleE = 0, _ruleF = 0, _ruleG = 0, _ruleH = 0, _ruleI = 0, _ruleJ = 0, _ruleK = 0, _ruleL = 0, _ruleM = 0, _ruleN = 0, _ruleO = 0, _ruleP = 0;
         PetriNetBuilder* parent = nullptr;
         bool reconstructTrace = false;
         std::chrono::high_resolution_clock::time_point _timer;
