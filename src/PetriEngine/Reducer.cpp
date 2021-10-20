@@ -1940,6 +1940,191 @@ namespace PetriEngine {
         return continueReductions;
     }
 
+    bool Reducer::ReducebyRuleQ(uint32_t* placeInQuery)
+    {
+        bool continueReductions = false;
+        const auto numberOfTrans = parent->numberOfTransitions();
+
+        for (uint32_t baseCon = 0; baseCon < numberOfTrans; baseCon++)
+        {
+            if (hasTimedout())
+                return continueReductions;
+
+            if (parent->_transitions[baseCon].skip ||
+                    parent->_transitions[baseCon].inhib ||
+                    parent->_transitions[baseCon].pre.size() != 1)
+                continue;
+
+            auto p = parent->_transitions[baseCon].pre[0].place;
+
+            if (placeInQuery[p] > 0 || parent->initialMarking[p] > 0)
+                continue;
+
+            const Place& place = parent->_places[p];
+
+            if (place.skip || place.inhib || place.producers.empty())
+                continue;
+
+            // Check that prod and cons are disjoint
+            const auto presize = place.producers.size();
+            const auto postsize = place.consumers.size();
+            bool ok = true;
+            uint32_t i = 0, j = 0;
+            while (i < presize && j < postsize)
+            {
+                if (place.producers[i] < place.consumers[j])
+                    i++;
+                else if (place.consumers[j] < place.producers[i])
+                    j++;
+                else
+                {
+                    ok = false;
+                    break;
+                }
+            }
+
+            if (!ok) continue;
+
+            // Now we analyze consumers further.
+            // - Consumers may not be inhibited and only consume from p.
+            // - Postset of consumers may not inhibit or appear in query.
+            // - All place->consumer arc weights must the same weight w
+            uint32_t w = 0;
+            for (auto con : place.consumers)
+            {
+                const Transition& tran = parent->_transitions[con];
+                if (tran.inhib || tran.pre.size() != 1)
+                {
+                    ok = false;
+                    break;
+                }
+
+                for (const auto arc : tran.post)
+                {
+                    if (w == 0)
+                    {
+                        w = arc.weight;
+                    }
+                    if (w != arc.weight ||
+                            placeInQuery[arc.place] > 0 ||
+                            parent->_places[arc.place].inhib)
+                    {
+                        ok = false;
+                        break;
+                    }
+                }
+            }
+
+            // Find producers for which we can fuse its firing with
+            // a combination of consumers
+            bool removedAll = true;
+            auto producers = place.producers;
+            for (auto prod_id : producers)
+            {
+                if (hasTimedout())
+                    return continueReductions;
+
+                Transition& prod = parent->_transitions[prod_id];
+                auto prodArc = getOutArc(prod, p);
+
+                if (prodArc->weight % w != 0)
+                {
+                    removedAll = false;
+                    continue;
+                }
+
+                auto k = prodArc->weight / w;
+                auto n = place.consumers.size();
+
+                if (k > 2 && 3 > n)
+                {
+                    // Too many combinations
+                    removedAll = false;
+                    continue;
+                }
+
+                // Enumerate the "n multichoose k" combinations of consumer firings
+                auto consumers = place.consumers;
+                std::vector<uint32_t> indices(k, 0);
+                while (true)
+                {
+                    // Create new transition with effect of firing the producer and a combination of consumers
+                    auto id = parent->_transitions.size();
+                    if (!_skipped_trans.empty())
+                    {
+                        id = _skipped_trans.back();
+                        _skipped_trans.pop_back();
+                        _removedTransitions--;
+                    }
+                    else
+                    {
+                        parent->_transitions.emplace_back();
+                        parent->_transitionnames[newTransName()] = id;
+                    }
+                    Transition& newtran = parent->_transitions[id];
+                    newtran.skip = false;
+                    newtran.inhib = false;
+
+                    // Arcs from producer
+                    for (auto& arc : prod.pre)
+                    {
+                        newtran.addPreArc(arc);
+                    }
+                    for (auto& arc : prod.post)
+                    {
+                        if (arc.place != p)
+                        {
+                            newtran.addPostArc(arc);
+                        }
+                    }
+                    // Arcs from consumers
+                    for (auto cons_index : indices)
+                    {
+                        Transition& cons = parent->_transitions[place.consumers[cons_index]];
+                        for (auto& arc : cons.post)
+                        {
+                            newtran.addPostArc(arc);
+                        }
+                    }
+
+                    for(auto& arc : newtran.pre)
+                        parent->_places[arc.place].addConsumer(id);
+                    for(auto& arc : newtran.post)
+                        parent->_places[arc.place].addProducer(id);
+
+                    // Update indices to the next combination
+                    // https://docs.python.org/3/library/itertools.html#itertools.combinations_with_replacement
+                    int32_t i = k;
+                    for (; i >= 0; i--)
+                        if (indices[i] != n - 1)
+                            break;
+                    if (i < 0)
+                        break;
+                    uint32_t l = indices[i] + 1;
+                    for (uint32_t j = i; j < k; j++)
+                        indices[j] = l;
+                }
+
+                skipTransition(prod_id);
+                continueReductions = true;
+                _ruleQ++;
+            }
+
+            if (removedAll)
+            {
+                auto consumers = place.consumers;
+                for (auto cons_id : consumers)
+                    skipTransition(cons_id);
+
+                skipPlace(p);
+            }
+
+            consistent();
+        }
+
+        return continueReductions;
+    }
+
     std::array tnames {
             "T-lb_balancing_receive_notification_10",
             "T-lb_balancing_receive_notification_2",
@@ -2028,7 +2213,7 @@ namespace PetriEngine {
         }
         else
         {
-            const char* rnames = "ABCDEFGHIJKLMN";
+            const char* rnames = "ABCDEFGHIJKLMNOPQ";
             for(int i = reduction.size() - 1; i >= 0; --i)
             {
                 if(next_safe)
@@ -2100,6 +2285,9 @@ namespace PetriEngine {
                             break;
                         case 13:
                             if (ReducebyRuleN(context.getQueryPlaceCount(), applyF)) changed = true;
+                            break;
+                        case 16:
+                            if (ReducebyRuleQ(context.getQueryPlaceCount())) changed = true;
                             break;
                     }
 #ifndef NDEBUG
