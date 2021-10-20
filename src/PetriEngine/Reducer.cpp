@@ -1750,7 +1750,8 @@ namespace PetriEngine {
         bool anythingSkipped = false;
         // Remove S and any transition consuming from S
         for (uint32_t place : S) {
-            for (uint32_t consumer : parent->_places[place].consumers) {
+            auto theplace = parent->_places[place];
+            for (uint32_t consumer : theplace.consumers) {
                 auto consumertrans = parent->_transitions[consumer];
                 // Avoid skipping already skipped transitions, and Inhibitor arcs don't count here
                 if (!consumertrans.skip && !getInArc(place, consumertrans)->inhib) {
