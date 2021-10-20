@@ -866,7 +866,7 @@ namespace PetriEngine {
         return continueReductions;
     }
     
-    bool Reducer::ReducebyRuleE(uint32_t* placeInQuery) {
+    bool Reducer::ReducebyRuleE(uint32_t* placeInQuery, bool useP) {
         // Rule P is an extension on Rule E
         bool continueReductions = false;
         const size_t numberofplaces = parent->numberOfPlaces();
@@ -875,6 +875,7 @@ namespace PetriEngine {
             if(hasTimedout()) return false;
             Place& place = parent->_places[p];
             if(place.skip) continue;
+            if(!useP && place.inhib) continue;
             if(place.producers.size() > place.consumers.size()) continue;
 
             bool ok = true;
@@ -1957,6 +1958,7 @@ namespace PetriEngine {
         if(reconstructTrace && enablereduction >= 1 && enablereduction <= 2)
             std::cout << "Rule H disabled when a trace is requested." << std::endl;
         bool applyF = std::count(reduction.begin(), reduction.end(), 5);
+        bool useP = std::count(reduction.begin(), reduction.end(), 15);
         if (enablereduction == 2) { // for k-boundedness checking only rules A, D and H are applicable
             bool changed = true;
             while (changed && !hasTimedout()) {
@@ -1979,7 +1981,7 @@ namespace PetriEngine {
                     do { // start by rules that do not move tokens
                         changed = false;
                         while(ReducebyRuleM(context.getQueryPlaceCount())) changed = true;
-                        while(ReducebyRuleE(context.getQueryPlaceCount())) changed = true;
+                        while(ReducebyRuleE(context.getQueryPlaceCount(), useP)) changed = true;
                         while(ReducebyRuleC(context.getQueryPlaceCount())) changed = true;
                         while(ReducebyRuleN(context.getQueryPlaceCount(), applyF)) changed = true;
                         while(ReducebyRuleF(context.getQueryPlaceCount())) changed = true;
@@ -2010,7 +2012,7 @@ namespace PetriEngine {
         }
         else
         {
-            const char* rnames = "ABCDEFGHIJKLMN";
+            const char* rnames = "ABCDEFGHIJKLMNOPQ";
             for(int i = reduction.size() - 1; i >= 0; --i)
             {
                 if(next_safe)
@@ -2054,7 +2056,7 @@ namespace PetriEngine {
                             while(ReducebyRuleD(context.getQueryPlaceCount())) changed = true;
                             break;              
                         case 4:
-                            while(ReducebyRuleE(context.getQueryPlaceCount())) changed = true;
+                            while(ReducebyRuleE(context.getQueryPlaceCount(), useP)) changed = true;
                             break;              
                         case 5:
                             while(ReducebyRuleF(context.getQueryPlaceCount())) changed = true;
