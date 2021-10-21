@@ -1943,9 +1943,8 @@ namespace PetriEngine {
     bool Reducer::ReducebyRuleQ(uint32_t* placeInQuery)
     {
         bool continueReductions = false;
-        const auto numberOfTrans = parent->numberOfTransitions();
 
-        for (uint32_t baseCon = 0; baseCon < numberOfTrans; baseCon++)
+        for (uint32_t baseCon = 0; baseCon < parent->numberOfTransitions(); baseCon++)
         {
             if (hasTimedout())
                 return continueReductions;
@@ -2024,7 +2023,7 @@ namespace PetriEngine {
                 if (hasTimedout())
                     return continueReductions;
 
-                Transition& prod = parent->_transitions[prod_id];
+                Transition prod = parent->_transitions[prod_id];
                 auto prodArc = getOutArc(prod, p);
 
                 if (prodArc->weight % w != 0)
@@ -2068,18 +2067,24 @@ namespace PetriEngine {
                     // Arcs from producer
                     for (auto& arc : prod.pre)
                     {
+                        printf("Producer PRE %s\n", getPlaceName(arc.place).c_str());
                         newtran.addPreArc(arc);
                     }
                     for (auto& arc : prod.post)
                     {
                         if (arc.place != p)
                         {
+                            printf("Producer POST %s\n", getTransitionName(prod_id).c_str());
                             newtran.addPostArc(arc);
                         }
                     }
                     // Arcs from consumers
                     for (auto cons_index : indices)
+                        printf("%d ", cons_index);
+                    printf("\n");
+                    for (auto cons_index : indices)
                     {
+                        printf("Consumer %s\n", getTransitionName(place.consumers[cons_index]).c_str());
                         Transition& cons = parent->_transitions[place.consumers[cons_index]];
                         for (auto& arc : cons.post)
                         {
@@ -2094,15 +2099,16 @@ namespace PetriEngine {
 
                     // Update indices to the next combination
                     // https://docs.python.org/3/library/itertools.html#itertools.combinations_with_replacement
-                    int32_t i = k;
-                    for (; i >= 0; i--)
-                        if (indices[i] != n - 1)
+                    int32_t mi = k - 1;
+                    for (; mi >= 0; mi--)
+                        if (indices[mi] != n - 1)
                             break;
-                    if (i < 0)
+                    printf("mi: %d\n", mi);
+                    if (mi < 0)
                         break;
-                    uint32_t l = indices[i] + 1;
-                    for (uint32_t j = i; j < k; j++)
-                        indices[j] = l;
+                    uint32_t ml = indices[mi] + 1;
+                    for (uint32_t mj = mi; mj < k; mj++)
+                        indices[mj] = ml;
                 }
 
                 skipTransition(prod_id);
