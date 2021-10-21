@@ -2059,6 +2059,7 @@ namespace PetriEngine {
                     {
                         parent->_transitions.emplace_back();
                         parent->_transitionnames[newTransName()] = id;
+                        parent->_transitionlocations.emplace_back(std::tuple<double, double>(0.0, 0.0));
                     }
                     Transition& newtran = parent->_transitions[id];
                     newtran.skip = false;
