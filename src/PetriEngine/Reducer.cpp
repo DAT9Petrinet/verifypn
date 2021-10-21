@@ -1984,13 +1984,11 @@ namespace PetriEngine {
 
             if (!ok) continue;
 
-            // Now we analyze consumers further.
-            // - Consumers may not be inhibited and only consume from p.
-            // - Postset of consumers may not inhibit or appear in query.
-            // - All place->consumer arc weights must the same weight w
+            // Now we analyze consumers further
             uint32_t w = 0;
             for (auto con : place.consumers)
             {
+                // Consumers may not be inhibited and only consume from p.
                 const Transition& tran = parent->_transitions[con];
                 if (tran.inhib || tran.pre.size() != 1)
                 {
@@ -1998,21 +1996,34 @@ namespace PetriEngine {
                     break;
                 }
 
+                // Post-set of consumers may not inhibit or appear in query.
                 for (const auto arc : tran.post)
                 {
-                    if (w == 0)
-                    {
-                        w = arc.weight;
-                    }
-                    if (w != arc.weight ||
-                            placeInQuery[arc.place] > 0 ||
-                            parent->_places[arc.place].inhib)
+                    if (placeInQuery[arc.place] > 0 || parent->_places[arc.place].inhib)
                     {
                         ok = false;
                         break;
                     }
                 }
+
+                // All pre arc of all consumers weights must the same weight w
+                for (const auto arc : tran.pre)
+                {
+                    if (w == 0)
+                    {
+                        w = arc.weight;
+                    }
+                    else if (w != arc.weight)
+                    {
+                        ok = false;
+                        break;
+                    }
+                }
+
+                if (!ok) break;
             }
+
+            if (!ok) continue;
 
             // Find producers for which we can fuse its firing with
             // a combination of consumers
@@ -2035,7 +2046,7 @@ namespace PetriEngine {
                 auto k = prodArc->weight / w;
                 auto n = place.consumers.size();
 
-                if (k > 2 && 3 > n)
+                if (2 < k && 3 < n)
                 {
                     // Too many combinations
                     removedAll = false;
@@ -2068,24 +2079,18 @@ namespace PetriEngine {
                     // Arcs from producer
                     for (auto& arc : prod.pre)
                     {
-                        printf("Producer PRE %s\n", getPlaceName(arc.place).c_str());
                         newtran.addPreArc(arc);
                     }
                     for (auto& arc : prod.post)
                     {
                         if (arc.place != p)
                         {
-                            printf("Producer POST %s\n", getTransitionName(prod_id).c_str());
                             newtran.addPostArc(arc);
                         }
                     }
                     // Arcs from consumers
                     for (auto cons_index : indices)
-                        printf("%d ", cons_index);
-                    printf("\n");
-                    for (auto cons_index : indices)
                     {
-                        printf("Consumer %s\n", getTransitionName(place.consumers[cons_index]).c_str());
                         Transition& cons = parent->_transitions[place.consumers[cons_index]];
                         for (auto& arc : cons.post)
                         {
@@ -2104,7 +2109,6 @@ namespace PetriEngine {
                     for (; mi >= 0; mi--)
                         if (indices[mi] != n - 1)
                             break;
-                    printf("mi: %d\n", mi);
                     if (mi < 0)
                         break;
                     uint32_t ml = indices[mi] + 1;
