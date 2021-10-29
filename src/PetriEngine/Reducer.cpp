@@ -879,6 +879,7 @@ namespace PetriEngine {
             if(place.producers.size() > place.consumers.size()) continue;
 
             bool ok = true;
+            // Check for producers without matching consumers first
             for(uint prod : place.producers)
             {
                 // Any producer without a matching consumer blocks this rule
@@ -894,6 +895,8 @@ namespace PetriEngine {
             if(!ok) continue;
 
             std::set<uint32_t> notenabled;
+            // Out of the consumers, tally up those that are initially not enabled by place
+            // Ensure all the enabled transitions that feed back into place are non-increasing on place.
             for(uint cons : place.consumers)
             {
                 Transition& t = getTransition(cons);
