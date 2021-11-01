@@ -181,7 +181,36 @@ namespace PetriEngine {
         pl.producers.clear();
         assert(consistent());
     }
-    
+
+    void Reducer::skipInArc(uint32_t p, uint32_t t)
+    {
+        Place& place = parent->_places[p];
+        Transition& trans = parent->_transitions[t];
+
+        eraseTransition(place.consumers, t);
+
+        Arc a;
+        a.place = p;
+        auto ait = std::lower_bound(trans.pre.begin(), trans.pre.end(), a);
+        assert(ait != trans.pre.end());
+        trans.pre.erase(ait);
+        assert(consistent());
+    }
+
+    void Reducer::skipOutArc(uint32_t t, uint32_t p)
+    {
+        Place& place = parent->_places[p];
+        Transition& trans = parent->_transitions[t];
+
+        eraseTransition(place.producers, t);
+
+        Arc a;
+        a.place = p;
+        auto ait = std::lower_bound(trans.post.begin(), trans.post.end(), a);
+        assert(ait != trans.post.end());
+        trans.post.erase(ait);
+        assert(consistent());
+    }
     
     bool Reducer::consistent()
     {
@@ -1535,15 +1564,20 @@ namespace PetriEngine {
                 if (arc.inhib) {
                     for (auto pt : place.consumers) {
                         if (!tseen[pt]) {
+                            // Summary of block: pt is seen unless it forms a non-decreasing
+                            // loop on place, or is inhibited by place
                             Transition &trans = parent->_transitions[pt];
                             auto it = trans.post.begin();
                             for (; it != trans.post.end(); ++it)
                                 if (it->place >= arc.place) break;
+
                             if (it != trans.post.end() && it->place == arc.place) {
                                 auto it2 = trans.pre.begin();
+                                // Find the arc from place to trans we know to exist
                                 for (; it2 != trans.pre.end(); ++it2)
-                                    if (it2->place >= arc.place || it2->inhib) break;
-                                if (it->weight <= it2->weight) continue;
+                                    if (it2->place >= arc.place) break;
+                                // No need for a || it2->place != arc.place condition, as trans was taken from place.consumers in the first place, so it2->place == arc.place always holds here.
+                                if (it2->inhib || it->weight >= it2->weight) continue;
                             }
                             tseen[pt] = true;
                             wtrans.push_back(pt);
@@ -1552,6 +1586,7 @@ namespace PetriEngine {
                 } else {
                     for (auto pt : place.producers) {
                         if (!tseen[pt]) {
+                            // Summary of block: pt is seen unless it forms a non-increasing loop on place
                             Transition &trans = parent->_transitions[pt];
                             auto it = trans.pre.begin();
                             for (; it != trans.pre.end(); ++it)
@@ -1563,7 +1598,6 @@ namespace PetriEngine {
                                     if (it2->place >= arc.place) break;
                                 if (it->weight >= it2->weight) continue;
                             }
-
                             tseen[pt] = true;
                             wtrans.push_back(pt);
                         }
@@ -1674,7 +1708,7 @@ namespace PetriEngine {
         return continueReductions;
     }
 
-    /*bool Reducer::ReducebyRuleM(uint32_t* placeInQuery) {
+    bool Reducer::ReducebyRuleM(uint32_t* placeInQuery) {
         // Maximum Unmarked Syphon removal. Using an overestimation we find a siphon, a set of places,
         // which will never have more than 0 tokens.
         // Rule 10 from "Structural Reductions Revisited" by Yann Theiry-Mieg
@@ -1769,10 +1803,10 @@ namespace PetriEngine {
             continueReductions = true;
         }
         return continueReductions;
-    }*/
+    }
 
     // Alternate implementation for Rule M, pending performance comparison
-    bool Reducer::ReducebyRuleM(uint32_t* placeInQuery) {
+    /*bool Reducer::ReducebyRuleM(uint32_t* placeInQuery) {
         // Maximum Unmarked Syphon removal. Using an overestimation we find a siphon, a set of places,
         // which will never have more than 0 tokens.
         // Rule 10 from "Structural Reductions Revisited" by Yann Theiry-Mieg
@@ -1856,6 +1890,338 @@ namespace PetriEngine {
             _ruleM++;
             continueReductions = true;
         }
+    }*/
+
+    bool Reducer::ReducebyRuleN(uint32_t* placeInQuery, bool applyF) {
+        // Redundant arc (and place) removal.
+        // If a place p never disables a transition, we can remove its arc to the
+        // transitions as long as the effect is maintained. Similarly, we can remove
+        // transitions that are always inhibited.
+
+        bool continueReductions = false;
+        const size_t numberofplaces = parent->numberOfPlaces();
+
+        for (uint32_t p = 0; p < numberofplaces; ++p)
+        {
+            if (hasTimedout()) return false;
+            Place& place = parent->_places[p];
+            if (place.skip) continue;
+
+            bool removePlace = placeInQuery[p] == 0;
+
+            // Use tflags to mark transitions with negative effect
+            _tflags.resize(parent->_transitions.size(), 0);
+            std::fill(_tflags.begin(), _tflags.end(), 0);
+
+            // Assume all consumers are disableable and non-negative until proven otherwise. Used to apply F.
+            uint32_t disableableNonNegative = place.consumers.size();
+
+            uint32_t inhibArcs = 0;
+
+            uint32_t low = parent->initialMarking[p];
+
+            for (uint cons : place.consumers)
+            {
+                Transition& tran = getTransition(cons);
+                auto inArc = getInArc(p, tran);
+
+                if (inArc->inhib)
+                {
+                    inhibArcs++;
+                    continue;
+                }
+
+                auto outArc = getOutArc(tran, p);
+
+                if (outArc != tran.post.end()) {
+
+                    uint32_t outArcWeight = outArc->weight;
+                    uint32_t inArcWeight = inArc->weight;
+
+                    if (outArcWeight < inArcWeight)
+                    {
+                        disableableNonNegative -= 1;
+                        _tflags[cons] = 1;
+                        removePlace = false;
+
+                        if (outArcWeight < low)
+                        {
+                            low = outArcWeight;
+                        }
+                    }
+                }
+                else
+                {
+                    low = 0;
+                    break;
+                }
+            }
+
+            // Consumer arcs exists, but none will have a weight lower than 0
+            if (!place.consumers.empty() && low == 0) continue;
+
+            std::set<uint32_t> alwaysInhibited;
+
+            for (uint cons : place.consumers)
+            {
+                if (_tflags[cons] == 1) continue;
+
+                Transition& tran = getTransition(cons);
+                auto inArc = getInArc(p, tran);
+
+                if (inArc->weight <= low)
+                {
+                    if (inArc->inhib)
+                    {
+                        alwaysInhibited.insert(cons);
+                    }
+                    else
+                    {
+                        auto outArc = getOutArc(tran, p);
+                        if (inArc->weight == outArc->weight)
+                        {
+                            skipOutArc(cons, p);
+                        }
+                        else
+                        {
+                            outArc->weight -= inArc->weight;
+                        }
+                        skipInArc(p, cons);
+
+                        disableableNonNegative -= 1;
+                        continueReductions = true;
+                        _ruleN += 1;
+
+                        // TODO Reconstruct trace
+                    }
+                }
+            }
+
+            inhibArcs -= alwaysInhibited.size();
+            _ruleN += alwaysInhibited.size();
+
+            for (auto inhibited : alwaysInhibited)
+                skipTransition(inhibited);
+
+            if (applyF && removePlace && inhibArcs == 0 && disableableNonNegative == 0 && numberofplaces - _removedPlaces > 1)
+            {
+                if(reconstructTrace)
+                {
+                    for(auto t : place.consumers)
+                    {
+                        std::string tname = getTransitionName(t);
+                        const ArcIter arc = getInArc(p, getTransition(t));
+                        _extraconsume[tname].emplace_back(getPlaceName(p), arc->weight);
+                    }
+                }
+                skipPlace(p);
+                continueReductions = true;
+                _ruleF++;
+            }
+            else if (inhibArcs == 0)
+            {
+                place.inhib = false;
+            }
+
+        }
+        assert(consistent());
+        return continueReductions;
+    }
+
+    bool Reducer::ReducebyRuleQ(uint32_t* placeInQuery)
+    {
+        bool continueReductions = false;
+
+        for (uint32_t baseCon = 0; baseCon < parent->numberOfTransitions(); baseCon++)
+        {
+            if (hasTimedout())
+                return continueReductions;
+
+            if (parent->_transitions[baseCon].skip ||
+                    parent->_transitions[baseCon].inhib ||
+                    parent->_transitions[baseCon].pre.size() != 1)
+                continue;
+
+            auto p = parent->_transitions[baseCon].pre[0].place;
+
+            if (placeInQuery[p] > 0 || parent->initialMarking[p] > 0)
+                continue;
+
+            const Place& place = parent->_places[p];
+
+            if (place.skip || place.inhib || place.producers.empty())
+                continue;
+
+            // Check that prod and cons are disjoint
+            const auto presize = place.producers.size();
+            const auto postsize = place.consumers.size();
+            bool ok = true;
+            uint32_t i = 0, j = 0;
+            while (i < presize && j < postsize)
+            {
+                if (place.producers[i] < place.consumers[j])
+                    i++;
+                else if (place.consumers[j] < place.producers[i])
+                    j++;
+                else
+                {
+                    ok = false;
+                    break;
+                }
+            }
+
+            if (!ok) continue;
+
+            // Now we analyze consumers further
+            uint32_t w = 0;
+            for (auto con : place.consumers)
+            {
+                // Consumers may not be inhibited and only consume from p.
+                const Transition& tran = parent->_transitions[con];
+                if (tran.inhib || tran.pre.size() != 1)
+                {
+                    ok = false;
+                    break;
+                }
+
+                // Post-set of consumers may not inhibit or appear in query.
+                for (const auto arc : tran.post)
+                {
+                    if (placeInQuery[arc.place] > 0 || parent->_places[arc.place].inhib)
+                    {
+                        ok = false;
+                        break;
+                    }
+                }
+
+                // All pre arc of all consumers weights must the same weight w
+                for (const auto arc : tran.pre)
+                {
+                    if (w == 0)
+                    {
+                        w = arc.weight;
+                    }
+                    else if (w != arc.weight)
+                    {
+                        ok = false;
+                        break;
+                    }
+                }
+
+                if (!ok) break;
+            }
+
+            if (!ok) continue;
+
+            // Find producers for which we can fuse its firing with
+            // a combination of consumers
+            bool removedAll = true;
+            auto producers = place.producers;
+            for (auto prod_id : producers)
+            {
+                if (hasTimedout())
+                    return continueReductions;
+
+                Transition prod = parent->_transitions[prod_id];
+                auto prodArc = getOutArc(prod, p);
+
+                if (prodArc->weight % w != 0)
+                {
+                    removedAll = false;
+                    continue;
+                }
+
+                auto k = prodArc->weight / w;
+                auto n = place.consumers.size();
+
+                if (2 < k && 3 < n)
+                {
+                    // Too many combinations
+                    removedAll = false;
+                    continue;
+                }
+
+                // Enumerate the "n multichoose k" combinations of consumer firings
+                auto consumers = place.consumers;
+                std::vector<uint32_t> indices(k, 0);
+                while (true)
+                {
+                    // Create new transition with effect of firing the producer and a combination of consumers
+                    auto id = parent->_transitions.size();
+                    if (!_skipped_trans.empty())
+                    {
+                        id = _skipped_trans.back();
+                        _skipped_trans.pop_back();
+                        _removedTransitions--;
+                    }
+                    else
+                    {
+                        parent->_transitions.emplace_back();
+                        parent->_transitionnames[newTransName()] = id;
+                        parent->_transitionlocations.emplace_back(std::tuple<double, double>(0.0, 0.0));
+                    }
+                    Transition& newtran = parent->_transitions[id];
+                    newtran.skip = false;
+                    newtran.inhib = false;
+
+                    // Arcs from producer
+                    for (auto& arc : prod.pre)
+                    {
+                        newtran.addPreArc(arc);
+                    }
+                    for (auto& arc : prod.post)
+                    {
+                        if (arc.place != p)
+                        {
+                            newtran.addPostArc(arc);
+                        }
+                    }
+                    // Arcs from consumers
+                    for (auto cons_index : indices)
+                    {
+                        Transition& cons = parent->_transitions[place.consumers[cons_index]];
+                        for (auto& arc : cons.post)
+                        {
+                            newtran.addPostArc(arc);
+                        }
+                    }
+
+                    for(auto& arc : newtran.pre)
+                        parent->_places[arc.place].addConsumer(id);
+                    for(auto& arc : newtran.post)
+                        parent->_places[arc.place].addProducer(id);
+
+                    // Update indices to the next combination
+                    // https://docs.python.org/3/library/itertools.html#itertools.combinations_with_replacement
+                    int32_t mi = k - 1;
+                    for (; mi >= 0; mi--)
+                        if (indices[mi] != n - 1)
+                            break;
+                    if (mi < 0)
+                        break;
+                    uint32_t ml = indices[mi] + 1;
+                    for (uint32_t mj = mi; mj < k; mj++)
+                        indices[mj] = ml;
+                }
+
+                skipTransition(prod_id);
+                continueReductions = true;
+                _ruleQ++;
+            }
+
+            if (removedAll)
+            {
+                auto consumers = place.consumers;
+                for (auto cons_id : consumers)
+                    skipTransition(cons_id);
+
+                skipPlace(p);
+            }
+
+            consistent();
+        }
+
+>>>>>>> origin/master
         return continueReductions;
     }
 
@@ -1893,6 +2259,7 @@ namespace PetriEngine {
         this->reconstructTrace = reconstructTrace;
         if(reconstructTrace && enablereduction >= 1 && enablereduction <= 2)
             std::cout << "Rule H disabled when a trace is requested." << std::endl;
+        bool applyF = std::count(reduction.begin(), reduction.end(), 5);
         if (enablereduction == 2) { // for k-boundedness checking only rules A, D and H are applicable
             bool changed = true;
             while (changed && !hasTimedout()) {
@@ -1905,7 +2272,7 @@ namespace PetriEngine {
                 }
             }
         }
-        else if (enablereduction == 1) { // in the aggressive reduction all four rules are used as long as they remove something
+        else if (enablereduction == 1) { // in the aggressive reduction all six rules are used as long as they remove something
             bool changed = false;
             do
             {
@@ -1917,6 +2284,7 @@ namespace PetriEngine {
                         while(ReducebyRuleM(context.getQueryPlaceCount())) changed = true;
                         while(ReducebyRuleE(context.getQueryPlaceCount())) changed = true;
                         while(ReducebyRuleC(context.getQueryPlaceCount())) changed = true;
+                        while(ReducebyRuleN(context.getQueryPlaceCount(), applyF)) changed = true;
                         while(ReducebyRuleF(context.getQueryPlaceCount())) changed = true;
                         while(ReducebyRuleL(context.getQueryPlaceCount())) changed = true;
                         if(!next_safe)
@@ -1945,7 +2313,7 @@ namespace PetriEngine {
         }
         else
         {
-            const char* rnames = "ABCDEFGHIJKLM";
+            const char* rnames = "ABCDEFGHIJKLMNOPQ";
             for(int i = reduction.size() - 1; i >= 0; --i)
             {
                 if(next_safe)
@@ -2014,6 +2382,12 @@ namespace PetriEngine {
                             break;
                         case 12:
                             if (ReducebyRuleM(context.getQueryPlaceCount())) changed = true;
+                            break;
+                        case 13:
+                            if (ReducebyRuleN(context.getQueryPlaceCount(), applyF)) changed = true;
+                            break;
+                        case 16:
+                            if (ReducebyRuleQ(context.getQueryPlaceCount())) changed = true;
                             break;
                     }
 #ifndef NDEBUG
