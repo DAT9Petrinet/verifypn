@@ -2220,8 +2220,6 @@ namespace PetriEngine {
 
             consistent();
         }
-
->>>>>>> origin/master
         return continueReductions;
     }
 
