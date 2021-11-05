@@ -80,7 +80,7 @@ namespace PetriEngine {
 
         int32_t removedTransitions()
         {
-            // Can be negative if transitions was added during reduction
+            // Can be negative if transitions were added during reduction
             return reducer.removedTransitions();
         }
 
