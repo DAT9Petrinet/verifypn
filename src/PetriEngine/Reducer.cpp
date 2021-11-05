@@ -72,15 +72,15 @@ namespace PetriEngine {
         return parent->numberOfPlaces() - numberOfSkippedPlaces();
     }
 
-    size_t Reducer::removedTransitions()
+    int32_t Reducer::removedTransitions()
     {
         // Can be negative if transitions was added during reduction
-        return parent->_originalNumberOfTransitions - numberOfUnskippedTransitions();
+        return (int32_t)parent->_originalNumberOfTransitions - (int32_t)numberOfUnskippedTransitions();
     }
 
-    size_t Reducer::removedPlaces()
+    int32_t Reducer::removedPlaces()
     {
-        return parent->_originalNumberOfPlaces - numberOfUnskippedPlaces();
+        return (int32_t)parent->_originalNumberOfPlaces - (int32_t)numberOfUnskippedPlaces();
     }
     
     std::string Reducer::getTransitionName(uint32_t transition)
@@ -240,7 +240,7 @@ namespace PetriEngine {
         for(size_t i = 0; i < parent->numberOfTransitions(); ++i)
         {
             Transition& t = parent->_transitions[i];
-            assert(std::find(_skippedTransitions.begin(), _skippedTransitions.end(), i) != _skippedTransitions.end());
+            assert(!t.skip || std::find(_skippedTransitions.begin(), _skippedTransitions.end(), i) != _skippedTransitions.end());
             assert(std::is_sorted(t.pre.begin(), t.pre.end()));
             assert(std::is_sorted(t.post.end(), t.post.end()));
             assert(!t.skip || (t.pre.size() == 0 && t.post.size() == 0));

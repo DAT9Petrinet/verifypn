@@ -159,8 +159,8 @@ namespace PetriEngine {
          * a decision-tree like construction, possibly improving successor generation. 
          */
         
-        uint32_t nplaces = _places.size() - reducer.numberOfSkippedPlaces();
-        uint32_t ntrans = _transitions.size() - reducer.RemovedTransitions();
+        uint32_t nplaces = numberOfUnskippedPlaces();
+        uint32_t ntrans = numberOfUnskippedTransitions();
         
         std::vector<uint32_t> place_cons_count = std::vector<uint32_t>(_places.size());
         std::vector<uint32_t> place_prod_count = std::vector<uint32_t>(_places.size());
@@ -470,7 +470,6 @@ namespace PetriEngine {
                 contains_next |= queries[i]->containsNext() || queries[i]->nestedDeadlock();                        
             }
         }
-        freezeOriginalSize();
         reducer.Reduce(placecontext, reductiontype, reconstructTrace, timeout, remove_loops, all_reach, contains_next, reductions);
     }
 

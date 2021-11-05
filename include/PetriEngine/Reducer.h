@@ -100,8 +100,8 @@ namespace PetriEngine {
 
         uint32_t numberOfUnskippedTransitions();
         uint32_t numberOfUnskippedPlaces();
-        size_t removedTransitions();
-        size_t removedPlaces();
+        int32_t removedTransitions();
+        int32_t removedPlaces();
 
         void printStats(std::ostream& out)
         {

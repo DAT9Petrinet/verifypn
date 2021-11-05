@@ -101,8 +101,8 @@ namespace PetriEngine {
 
         void freezeOriginalSize()
         {
-            _originalNumberOfPlaces = numberOfUnskippedTransitions();
-            _originalNumberOfTransitions = numberOfUnskippedPlaces();
+            _originalNumberOfPlaces = numberOfUnskippedPlaces();
+            _originalNumberOfTransitions = numberOfUnskippedTransitions();
         }
 
         const std::unordered_map<std::string, uint32_t>& getPlaceNames() const
