@@ -78,23 +78,23 @@ namespace PetriEngine {
             return _originalNumberOfTransitions;
         }
 
-        size_t removedTransitions()
+        int32_t removedTransitions()
         {
             // Can be negative if transitions was added during reduction
             return reducer.removedTransitions();
         }
 
-        size_t numberOfUnskippedTransitions()
-        {
-            return reducer.numberOfUnskippedTransitions();
-        }
-
-        size_t removedPlaces()
+        int32_t removedPlaces()
         {
             return reducer.removedPlaces();
         }
 
-        size_t numberOfUnskippedPlaces()
+        uint32_t numberOfUnskippedTransitions()
+        {
+            return reducer.numberOfUnskippedTransitions();
+        }
+
+        uint32_t numberOfUnskippedPlaces()
         {
             return reducer.numberOfUnskippedPlaces();
         }
