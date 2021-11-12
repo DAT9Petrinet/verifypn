@@ -1873,6 +1873,7 @@ namespace PetriEngine {
                     if (inArc->inhib)
                     {
                         alwaysInhibited.insert(cons);
+                        continueReductions = true;
                     }
                     else
                     {
@@ -1897,7 +1898,7 @@ namespace PetriEngine {
             }
 
             inhibArcs -= alwaysInhibited.size();
-            _ruleN += alwaysInhibited.size();
+            _ruleO += alwaysInhibited.size();
 
             for (auto inhibited : alwaysInhibited)
                 skipTransition(inhibited);
