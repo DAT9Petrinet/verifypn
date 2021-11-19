@@ -2167,10 +2167,7 @@ namespace PetriEngine {
                 if (!ok) break;
 
                 // Find greatest weight between pid and consumers
-                for (const auto arc : tran.pre)
-                {
-                    maxConW = std::max(maxConW, arc.weight);
-                }
+                maxConW = std::max(maxConW, tran.pre[0].weight);
             }
 
             if (!ok) continue;
