@@ -2477,8 +2477,8 @@ namespace PetriEngine {
                 }
             }
             bool changed = true;
-            bool rZeroAvailable = (std::find(reduction.begin(), reduction.end(), 20) != reduction.end());
-            while((changed || rZeroAvailable) && !hasTimedout())
+            bool rLastAvailable = (std::find(reduction.begin(), reduction.end(), 20) != reduction.end());
+            while((changed || rLastAvailable) && !hasTimedout())
             {
                 changed = false;
                 for(auto r : reduction)
@@ -2545,9 +2545,12 @@ namespace PetriEngine {
                             if (ReducebyRuleR(context.getQueryPlaceCount(), 2)) changed = true;
                             break;
                         case 20:
-                            if (!changed && rZeroAvailable){
-                                if (ReducebyRuleR(context.getQueryPlaceCount(), 3)) changed = true;
-                                rZeroAvailable = false;
+                            if (!changed && rLastAvailable){
+                                if (ReducebyRuleR(context.getQueryPlaceCount(), 3)){
+                                    changed = true;
+                                } else {
+                                    rLastAvailable = false;
+                                }
                             }
                             break;
                     }
