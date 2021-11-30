@@ -2191,14 +2191,28 @@ namespace PetriEngine {
         return continueReductions;
     }
 
-    bool Reducer::ReducebyRuleR(uint32_t* placeInQuery)
+    bool Reducer::ReducebyRuleR(uint32_t* placeInQuery, uint8_t rmode)
     {
+        // rmode has 4 options:
+        // 0 for normal operation
+        // 1 for a 5 second local time limit
+        // 2 for a 2x original transitions space limit
+        // 3 for only applying once after all other rules have run to exhaustion, and then applying the other rules again.
+
+        std::chrono::high_resolution_clock::time_point localTimer = std::chrono::high_resolution_clock::now();
+        int localTimeout = 5;
+        uint32_t spaceLimit = 2 * parent->originalNumberOfTransitions();
         bool continueReductions = false;
 
         for (uint32_t pid = 0; pid < parent->numberOfPlaces(); pid++)
         {
             if (hasTimedout())
                 return false;
+            if (rmode == 1 && genericTimeout(localTimer, localTimeout)) {
+                return false;
+            } else if (rmode == 2 && parent->numberOfTransitions() > spaceLimit) {
+                return false;
+            }
 
             const Place& place = parent->_places[pid];
 
@@ -2262,6 +2276,11 @@ namespace PetriEngine {
             {
                 if (hasTimedout())
                     return false;
+                if (rmode == 1 && genericTimeout(localTimer, localTimeout)) {
+                    return false;
+                } else if (rmode == 2 && parent->numberOfTransitions() > spaceLimit) {
+                    return false;
+                }
 
                 Transition prod = parent->_transitions[prod_id];
                 auto prodArc = getOutArc(prod, pid);
@@ -2423,7 +2442,7 @@ namespace PetriEngine {
                     { // then apply tokens moving rules
                         //while(ReducebyRuleJ(context.getQueryPlaceCount())) changed = true;
                         while(ReducebyRuleQ(context.getQueryPlaceCount())) changed = true;
-                        while(ReducebyRuleR(context.getQueryPlaceCount())) changed = true;
+                        while(ReducebyRuleR(context.getQueryPlaceCount(), 0)) changed = true;
                         while(ReducebyRuleD(context.getQueryPlaceCount())) changed = true; // For cleanup
                         while(ReducebyRuleB(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
                         while(ReducebyRuleA(context.getQueryPlaceCount())) changed = true;
@@ -2458,7 +2477,8 @@ namespace PetriEngine {
                 }
             }
             bool changed = true;
-            while(changed && !hasTimedout())
+            bool rZeroAvailable = (std::find(reduction.begin(), reduction.end(), 20) != reduction.end());
+            while((changed || rZeroAvailable) && !hasTimedout())
             {
                 changed = false;
                 for(auto r : reduction)
@@ -2516,7 +2536,19 @@ namespace PetriEngine {
                             if (ReducebyRuleQ(context.getQueryPlaceCount())) changed = true;
                             break;
                         case 17:
-                            if (ReducebyRuleR(context.getQueryPlaceCount())) changed = true;
+                            if (ReducebyRuleR(context.getQueryPlaceCount(), 0)) changed = true;
+                            break;
+                        case 18:
+                            if (ReducebyRuleR(context.getQueryPlaceCount(), 1)) changed = true;
+                            break;
+                        case 19:
+                            if (ReducebyRuleR(context.getQueryPlaceCount(), 2)) changed = true;
+                            break;
+                        case 20:
+                            if (!changed && rZeroAvailable){
+                                if (ReducebyRuleR(context.getQueryPlaceCount(), 3)) changed = true;
+                                rZeroAvailable = false;
+                            }
                             break;
                     }
 #ifndef NDEBUG
