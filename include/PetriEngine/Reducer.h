@@ -154,7 +154,7 @@ namespace PetriEngine {
         bool ReducebyRuleM(uint32_t* placeInQuery);
         bool ReducebyRuleN(uint32_t* placeInQuery, bool applyF);
         bool ReducebyRuleQ(uint32_t* placeInQuery);
-        bool ReducebyRuleR(uint32_t* placeInQuery);
+        bool ReducebyRuleR(uint32_t* placeInQuery, uint8_t rmode);
 
         std::optional<std::pair<std::vector<bool>, std::vector<bool>>>relevant(const uint32_t* placeInQuery, bool remove_consumers);
 
@@ -175,9 +175,12 @@ namespace PetriEngine {
         bool consistent();
 
         bool hasTimedout() const {
+            return genericTimeout(_timer, _timeout);
+        }
+        bool genericTimeout(std::chrono::high_resolution_clock::time_point timer, int timeout) const {
             auto end = std::chrono::high_resolution_clock::now();
-            auto diff = std::chrono::duration_cast<std::chrono::seconds>(end - _timer);
-            return (diff.count() >= _timeout);
+            auto diff = std::chrono::duration_cast<std::chrono::seconds>(end - timer);
+            return (diff.count() >= timeout);
         }
         std::vector<std::string> _initfire;
         std::unordered_map<std::string, std::vector<std::string>> _postfire;
