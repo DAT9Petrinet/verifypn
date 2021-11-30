@@ -2274,7 +2274,6 @@ namespace PetriEngine {
 
 
                 // Combine producer with the consumers
-                auto n = place.consumers.size();
                 auto consumers = place.consumers;
                 for (auto con_id : consumers)
                 {
