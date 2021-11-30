@@ -2110,10 +2110,11 @@ namespace PetriEngine {
 
     bool Reducer::ReducebyRuleR(uint32_t* placeInQuery, uint8_t rmode)
     {
-        // rmode has 3 options:
-        // 0 for only applying once after all other rules have run to exhaustion, and then applying the other rules again.
+        // rmode has 4 options:
+        // 0 for normal operation
         // 1 for a 5 second local time limit
         // 2 for a 2x original transitions space limit
+        // 3 for only applying once after all other rules have run to exhaustion, and then applying the other rules again.
 
         std::chrono::high_resolution_clock::time_point localTimer = std::chrono::high_resolution_clock::now();
         int localTimeout = 5;
@@ -2393,7 +2394,7 @@ namespace PetriEngine {
                 }
             }
             bool changed = true;
-            bool rZeroAvailable = (std::find(reduction.begin(), reduction.end(), 17) != reduction.end());
+            bool rZeroAvailable = (std::find(reduction.begin(), reduction.end(), 20) != reduction.end());
             while((changed || rZeroAvailable) && !hasTimedout())
             {
                 changed = false;
@@ -2452,16 +2453,19 @@ namespace PetriEngine {
                             if (ReducebyRuleQ(context.getQueryPlaceCount())) changed = true;
                             break;
                         case 17:
-                            if (!changed && rZeroAvailable){
-                                if (ReducebyRuleR(context.getQueryPlaceCount(), 0)) changed = true;
-                                rZeroAvailable = false;
-                            }
+                            if (ReducebyRuleR(context.getQueryPlaceCount(), 0)) changed = true;
                             break;
                         case 18:
                             if (ReducebyRuleR(context.getQueryPlaceCount(), 1)) changed = true;
                             break;
                         case 19:
                             if (ReducebyRuleR(context.getQueryPlaceCount(), 2)) changed = true;
+                            break;
+                        case 20:
+                            if (!changed && rZeroAvailable){
+                                if (ReducebyRuleR(context.getQueryPlaceCount(), 3)) changed = true;
+                                rZeroAvailable = false;
+                            }
                             break;
                     }
 #ifndef NDEBUG
