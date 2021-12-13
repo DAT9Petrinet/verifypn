@@ -2126,9 +2126,9 @@ namespace PetriEngine {
             if (hasTimedout())
                 return false;
             if (rmode == 1 && genericTimeout(localTimer, localTimeout)) {
-                return false;
-            } else if (rmode == 2 && parent->numberOfTransitions() > spaceLimit) {
-                return false;
+                return continueReductions;
+            } else if (rmode == 2 && parent->numberOfUnskippedTransitions() > spaceLimit) {
+                return continueReductions;
             }
 
             const Place& place = parent->_places[pid];
@@ -2194,9 +2194,9 @@ namespace PetriEngine {
                 if (hasTimedout())
                     return false;
                 if (rmode == 1 && genericTimeout(localTimer, localTimeout)) {
-                    return false;
-                } else if (rmode == 2 && parent->numberOfTransitions() > spaceLimit) {
-                    return false;
+                    return continueReductions;
+                } else if (rmode == 2 && parent->numberOfUnskippedTransitions() > spaceLimit) {
+                    return continueReductions;
                 }
 
                 Transition prod = parent->_transitions[prod_id];
