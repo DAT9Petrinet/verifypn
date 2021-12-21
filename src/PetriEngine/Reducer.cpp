@@ -2381,7 +2381,7 @@ namespace PetriEngine {
             "T-server_process_7"
     };
 
-    void Reducer::Reduce(QueryPlaceAnalysisContext& context, int enablereduction, bool reconstructTrace, int timeout, bool remove_loops, bool remove_consumers, bool next_safe, std::vector<uint32_t>& reduction) {
+    void Reducer::Reduce(QueryPlaceAnalysisContext& context, int enablereduction, bool reconstructTrace, int timeout, bool remove_loops, bool remove_consumers, bool next_safe, std::vector<uint32_t>& reduction, std::vector<uint32_t>& secondaryreductions) {
 
         this->_timeout = timeout;
         _timer = std::chrono::high_resolution_clock::now();
@@ -2451,7 +2451,7 @@ namespace PetriEngine {
             {
                 if(next_safe)
                 {
-                    if(reduction[i] != 2 && reduction[i] != 4 && reduction[i] != 5 && reduction[i] != 16 && reduction[i] != 17)
+                    if(reduction[i] != 2 && reduction[i] != 4 && reduction[i] != 5 && reduction[i] != 16 && !(reduction[i] >= 17 && reduction[i] <= 20))
                     {
                         std::cerr << "Skipping Rule" << rnames[reduction[i]] << " due to NEXT operator in proposition" << std::endl;
                         reduction.erase(reduction.begin() + i);
@@ -2466,92 +2466,110 @@ namespace PetriEngine {
             }
             bool changed = true;
             bool rLastAvailable = (std::find(reduction.begin(), reduction.end(), 20) != reduction.end());
-            while((changed || rLastAvailable) && !hasTimedout())
-            {
-                changed = false;
-                for(auto r : reduction)
+            uint8_t lastChangeRound = 0;
+            uint8_t currentRound = 0;
+            std::vector<std::vector<uint32_t>> reductionset = {reduction, secondaryreductions};
+
+            do{
+                while((changed || rLastAvailable) && !hasTimedout())
                 {
-#ifndef NDEBUG
-                    auto c = std::chrono::high_resolution_clock::now();
-                    auto op = numberOfUnskippedPlaces();
-                    auto ot = numberOfUnskippedTransitions();
-#endif
-                    switch(r)
+                    changed = false;
+                    for(auto r : reductionset[currentRound])
                     {
-                        case 0:
-                            while(ReducebyRuleA(context.getQueryPlaceCount())) changed = true;
-                            break;
-                        case 1:
-                            while(ReducebyRuleB(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
-                            break;
-                        case 2:
-                            while(ReducebyRuleC(context.getQueryPlaceCount())) changed = true;
-                            break;
-                        case 3:
-                            while(ReducebyRuleD(context.getQueryPlaceCount())) changed = true;
-                            break;              
-                        case 4:
-                            while(ReducebyRuleE(context.getQueryPlaceCount())) changed = true;
-                            break;              
-                        case 5:
-                            while(ReducebyRuleF(context.getQueryPlaceCount())) changed = true;
-                            break;             
-                        case 6:
-                            while(ReducebyRuleG(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
-                            break;             
-                        case 7:
-                            while(ReducebyRuleH(context.getQueryPlaceCount())) changed = true;
-                            break;             
-                        case 8:
-                            while(ReducebyRuleI(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
-                            break;                            
-                        case 9:
-                            while(ReducebyRuleJ(context.getQueryPlaceCount())) changed = true;
-                            break;
-                        case 10:
-                            if (ReducebyRuleK(context.getQueryPlaceCount(), remove_consumers)) changed = true;
-                            break;
-                        case 11:
-                            if (ReducebyRuleL(context.getQueryPlaceCount())) changed = true;
-                            break;
-                        case 12:
-                            if (ReducebyRuleM(context.getQueryPlaceCount())) changed = true;
-                            break;
-                        case 13:
-                            if (ReducebyRuleN(context.getQueryPlaceCount(), applyF)) changed = true;
-                            break;
-                        case 16:
-                            if (ReducebyRuleQ(context.getQueryPlaceCount())) changed = true;
-                            break;
-                        case 17:
-                            if (ReducebyRuleR(context.getQueryPlaceCount(), 0)) changed = true;
-                            break;
-                        case 18:
-                            if (ReducebyRuleR(context.getQueryPlaceCount(), 1)) changed = true;
-                            break;
-                        case 19:
-                            if (ReducebyRuleR(context.getQueryPlaceCount(), 2)) changed = true;
-                            break;
-                        case 20:
-                            if (!changed && rLastAvailable){
-                                if (ReducebyRuleR(context.getQueryPlaceCount(), 3)){
-                                    changed = true;
-                                } else {
-                                    rLastAvailable = false;
+    #ifndef NDEBUG
+                        auto c = std::chrono::high_resolution_clock::now();
+                        auto op = numberOfUnskippedPlaces();
+                        auto ot = numberOfUnskippedTransitions();
+    #endif
+                        switch(r)
+                        {
+                            case 0:
+                                while(ReducebyRuleA(context.getQueryPlaceCount())) changed = true;
+                                break;
+                            case 1:
+                                while(ReducebyRuleB(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
+                                break;
+                            case 2:
+                                while(ReducebyRuleC(context.getQueryPlaceCount())) changed = true;
+                                break;
+                            case 3:
+                                while(ReducebyRuleD(context.getQueryPlaceCount())) changed = true;
+                                break;
+                            case 4:
+                                while(ReducebyRuleE(context.getQueryPlaceCount())) changed = true;
+                                break;
+                            case 5:
+                                while(ReducebyRuleF(context.getQueryPlaceCount())) changed = true;
+                                break;
+                            case 6:
+                                while(ReducebyRuleG(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
+                                break;
+                            case 7:
+                                while(ReducebyRuleH(context.getQueryPlaceCount())) changed = true;
+                                break;
+                            case 8:
+                                while(ReducebyRuleI(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
+                                break;
+                            case 9:
+                                while(ReducebyRuleJ(context.getQueryPlaceCount())) changed = true;
+                                break;
+                            case 10:
+                                if (ReducebyRuleK(context.getQueryPlaceCount(), remove_consumers)) changed = true;
+                                break;
+                            case 11:
+                                if (ReducebyRuleL(context.getQueryPlaceCount())) changed = true;
+                                break;
+                            case 12:
+                                if (ReducebyRuleM(context.getQueryPlaceCount())) changed = true;
+                                break;
+                            case 13:
+                                if (ReducebyRuleN(context.getQueryPlaceCount(), applyF)) changed = true;
+                                break;
+                            case 16:
+                                if (ReducebyRuleQ(context.getQueryPlaceCount())) changed = true;
+                                break;
+                            case 17:
+                                if (ReducebyRuleR(context.getQueryPlaceCount(), 0)) changed = true;
+                                break;
+                            case 18:
+                                if (ReducebyRuleR(context.getQueryPlaceCount(), 1)) changed = true;
+                                break;
+                            case 19:
+                                if (ReducebyRuleR(context.getQueryPlaceCount(), 2)) changed = true;
+                                break;
+                            case 20:
+                                if (!changed && rLastAvailable){
+                                    if (ReducebyRuleR(context.getQueryPlaceCount(), 3)){
+                                        changed = true;
+                                    } else {
+                                        rLastAvailable = false;
+                                    }
                                 }
-                            }
+                                break;
+                        }
+    #ifndef NDEBUG
+                        auto end = std::chrono::high_resolution_clock::now();
+                        auto diff = std::chrono::duration_cast<std::chrono::seconds>(end - c);
+                        std::cout << "SPEND " << diff.count()  << " ON " << rnames[r] << std::endl;
+                        std::cout << "REM " << ((int)op - (int)numberOfUnskippedPlaces()) << " " << ((int)ot - (int)numberOfUnskippedTransitions()) << std::endl;
+    #endif
+                        if(hasTimedout())
                             break;
                     }
-#ifndef NDEBUG
-                    auto end = std::chrono::high_resolution_clock::now();
-                    auto diff = std::chrono::duration_cast<std::chrono::seconds>(end - c);
-                    std::cout << "SPEND " << diff.count()  << " ON " << rnames[r] << std::endl;
-                    std::cout << "REM " << ((int)op - (int)numberOfUnskippedPlaces()) << " " << ((int)ot - (int)numberOfUnskippedTransitions()) << std::endl;
-#endif
-                    if(hasTimedout())
-                        break;
+
+                    if (enablereduction == 4){
+                        if (changed){
+                            lastChangeRound = currentRound;
+                        }
+                    }
                 }
-            }
+
+                if (enablereduction == 4) {
+                    currentRound = (currentRound + 1) % 2;
+                    changed = true;
+                }
+            // If lastChangeRound == currentRound, that means nothing has changed since last time we reached that round.
+            } while (enablereduction == 4 && !hasTimedout() && lastChangeRound != currentRound);
         }
 
         return;
