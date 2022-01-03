@@ -2002,21 +2002,21 @@ namespace PetriEngine {
         {
             // Find initially marked place which is the only input to its single consumer
 
-            if (parent->initialMarking[p] == 0) continue;
+            if (parent->initialMarking[p] == 0 || placeInQuery[p] > 0) continue;
 
             Place place = parent->_places[p];
 
-            if (place.skip || place.consumers.size() != 1) continue;
+            if (place.skip || place.inhib || place.consumers.size() != 1) continue;
 
             Transition& tran = parent->_transitions[place.consumers[0]];
 
-            if (tran.pre.size() != 1 || parent->initialMarking[p] % tran.pre[0].weight != 0) continue;
+            if (tran.inhib || tran.pre.size() != 1 || parent->initialMarking[p] % tran.pre[0].weight != 0) continue;
 
-            // The place cannot be in the postset too
+            // The place cannot be in the postset, and postset cannot inhibit
             bool ok = true;
             for (auto postarc : tran.post)
             {
-                if (postarc.place == p)
+                if (postarc.place == p || placeInQuery[postarc.place] > 0 || parent->_places[postarc.place].inhib)
                 {
                     ok = false;
                     break;
@@ -2034,7 +2034,8 @@ namespace PetriEngine {
             {
                 parent->initialMarking[postarc.place] += postarc.weight * k;
             }
-            
+
+            _ruleQ++;
             continueReductions = true;
         }
 
