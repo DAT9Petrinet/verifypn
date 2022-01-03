@@ -1994,29 +1994,52 @@ namespace PetriEngine {
 
     bool Reducer::ReducebyRuleQ(uint32_t* placeInQuery)
     {
-        // Empty places with only a single consumer
+        // Fire initially enabled transitions if they are the single consumer of their preset
 
         bool continueReductions = false;
 
-        for (uint32_t p = 0; p < parent->numberOfPlaces(); ++p)
+        for (uint32_t t = 0; t < parent->numberOfTransitions(); ++t)
         {
-            // Find initially marked place which is the only input to its single consumer
+            Transition& tran = parent->_transitions[t];
 
-            if (parent->initialMarking[p] == 0 || placeInQuery[p] > 0) continue;
+            if (tran.skip || tran.inhib || tran.pre.empty()) continue;
 
-            Place place = parent->_places[p];
-
-            if (place.skip || place.inhib || place.consumers.size() != 1) continue;
-
-            Transition& tran = parent->_transitions[place.consumers[0]];
-
-            if (tran.inhib || tran.pre.size() != 1 || parent->initialMarking[p] % tran.pre[0].weight != 0) continue;
-
-            // The place cannot be in the postset, and postset cannot inhibit
+            // We take advantage of pre and post being sorted as well as the overloaded < operator to check:
+            // - Preset and postset must be disjoint
+            // - Preset and postset cannot inhibit or be in query
+            // - How many times can we fire the transition
+            uint32_t k = 0;
             bool ok = true;
-            for (auto postarc : tran.post)
+            uint32_t i = 0, j = 0;
+            while (i < tran.pre.size() || j < tran.post.size())
             {
-                if (postarc.place == p || placeInQuery[postarc.place] > 0 || parent->_places[postarc.place].inhib)
+                if (j == tran.post.size() || tran.pre[i] < tran.post[j])
+                {
+                    auto prearc = tran.pre[i];
+                    uint32_t n = parent->initialMarking[prearc.place] / prearc.weight;
+                    if (n == 0 || parent->_places[prearc.place].inhib || placeInQuery[prearc.place] > 0)
+                    {
+                        ok = false;
+                        break;
+                    }
+                    else
+                    {
+                        if (k == 0) k = n;
+                        else k = std::min(k, n);
+                    }
+                    i++;
+                }
+                else if (i == tran.pre.size() || tran.post[j] < tran.pre[i])
+                {
+                    auto postarc = tran.post[j];
+                    if (parent->_places[postarc.place].inhib || placeInQuery[postarc.place] > 0)
+                    {
+                        ok = false;
+                        break;
+                    }
+                    j++;
+                }
+                else
                 {
                     ok = false;
                     break;
@@ -2025,11 +2048,11 @@ namespace PetriEngine {
 
             if (!ok) continue;
 
-            // How many times the transition can fire
-            uint32_t k = parent->initialMarking[p] / tran.pre[0].weight;
-
             // Update initial marking
-            parent->initialMarking[p] = 0;
+            for (auto prearc : tran.pre)
+            {
+                parent->initialMarking[prearc.place] -= prearc.weight * k;
+            }
             for (auto postarc : tran.post)
             {
                 parent->initialMarking[postarc.place] += postarc.weight * k;
