@@ -1632,6 +1632,28 @@ namespace PetriEngine {
                     }
                 }
 
+                // Loop to cover effects of in arcs without a matching out arc
+                for (i = 0; i < superset_tran.pre.size(); ++i) {
+                    uint32_t place = superset_tran.pre[i].place;
+
+                    // Skip those checked in the out loop
+                    auto superset_out = getOutArc(superset_tran, place);
+                    if (superset_out == subset_tran.pre.end()) continue;
+
+                    uint32_t superset_in_weight = superset_tran.pre[i].weight;
+
+                    size_t subset_in_weight = 0;
+                    auto subset_in = getInArc(place, subset_tran);
+                    if (subset_in != subset_tran.pre.end()) subset_in_weight = subset_in->weight;
+
+                    if (superset_in_weight != subset_in_weight) {
+                        canT1BeRemoved = false;
+                        canT2BeRemoved = false;
+                        ok = false;
+                        break;
+                    }
+                }
+
                 // Go to next t2
                 if (!ok) {
                     continue;
