@@ -1524,49 +1524,41 @@ namespace PetriEngine {
         bool continueReductions = false;
         for (size_t t1 = 0; t1 < parent->numberOfTransitions() - 1; ++t1) {
             Transition &tran1 = getTransition(t1);
+            if (tran1.skip) break;
             for (auto & t1i : tran1.pre){
                 Place &p = parent->_places[t1i.place];
                 for (uint32_t t2 : p.consumers){
                     if (hasTimedout()) return false;
 
-                    if (t2 <= t1) continue;
+                    if (t2 == t1) continue;
 
-                    // We check if t1 or t2 can be removed
-                    if (tran1.skip) break;
                     Transition &tran2 = getTransition(t2);
                     if (tran2.skip) continue;
 
                     bool canT1BeRemoved = tran1.pre.size() >= tran2.pre.size() && tran1.post.size() >= tran2.post.size();
-                    bool canT2BeRemoved = tran2.pre.size() >= tran1.pre.size() && tran2.post.size() >= tran1.post.size();
+                    //bool canT2BeRemoved = tran2.pre.size() >= tran1.pre.size() && tran2.post.size() >= tran1.post.size();
 
-                    if (!(canT1BeRemoved || canT2BeRemoved)) {
+                    if (!(canT1BeRemoved)) {
                         continue;
                     }
 
                     // get arcs
-                    std::vector<Arc> pre_subset = tran1.pre;
-                    std::vector<Arc> pre_superset = tran2.pre;
-                    std::vector<Arc> post_subset = tran1.post;
-                    std::vector<Arc> post_superset = tran2.post;
-                    if (canT1BeRemoved) {
-                        pre_subset = tran2.pre;
-                        pre_superset = tran1.pre;
-                        post_subset = tran2.post;
-                        post_superset = tran1.post;
-                    }
+                    const std::vector<Arc> & pre_subset = tran2.pre;
+                    const std::vector<Arc> & pre_superset = tran1.pre;
+                    const std::vector<Arc> & post_subset = tran2.post;
+                    const std::vector<Arc> & post_superset = tran1.post;
 
                     bool ok = true;
                     uint32_t i = 0, j = 0, k = 0, l = 0;
                     bool i_done = i >= pre_subset.size(), j_done = j >= pre_superset.size(), k_done = k >= post_subset.size(), l_done = l >= post_superset.size();
-
                     // Taking advantage of the pre- and post-sets being ordered by place_id
                     while (!i_done || !j_done || !k_done || !l_done) {
                         if (hasTimedout()) return false;
                         // The lowest place_id from a set that is not done yet
                         auto place = std::min({i_done ? std::numeric_limits<uint32_t>::max() : pre_subset[i].place,
                                                j_done ? std::numeric_limits<uint32_t>::max() : pre_superset[j].place,
-                                                       k_done ? std::numeric_limits<uint32_t>::max() : post_subset[k].place,
-                                                                l_done ? std::numeric_limits<uint32_t>::max() : post_superset[l].place});
+                                               k_done ? std::numeric_limits<uint32_t>::max() : post_subset[k].place,
+                                               l_done ? std::numeric_limits<uint32_t>::max() : post_superset[l].place});
 
                         // Precondition stuff
                         if (!i_done && place == pre_subset[i].place) {
@@ -1586,27 +1578,6 @@ namespace PetriEngine {
 
                                 // Check the requirement to fire. For non-inhibitors i <= j should hold, for inhibitors it is i >= j
                                 if ((!pre_subset[i].inhib && pre_superset[j].weight < pre_subset[i].weight) || (pre_subset[i].inhib && pre_superset[j].weight > pre_subset[i].weight)) {
-                                    if (canT1BeRemoved && canT2BeRemoved) {
-                                        // Must have been equally long, and then we assume t1 could be removed. Turns out
-                                        // thats not the case. Maybe the other way around?
-                                        canT1BeRemoved = false;
-                                        std::swap(pre_superset, pre_subset);
-                                        std::swap(post_superset, post_subset);
-                                        i = 0;
-                                        j = 0;
-                                        k = 0;
-                                        l = 0;
-                                        i_done = i >= pre_subset.size();
-                                        j_done = j >= pre_superset.size();
-                                        k_done = k >= post_subset.size();
-                                        l_done = l >= post_superset.size();
-                                        continue;
-
-                                    } else if (canT1BeRemoved) {
-                                        canT1BeRemoved = false;
-                                    } else if (canT2BeRemoved) {
-                                        canT2BeRemoved = false;
-                                    }
                                     ok = false;
                                     break;
                                 }
@@ -1640,8 +1611,6 @@ namespace PetriEngine {
                         }
 
                         if ((superset_out_weight - superset_in_weight) != (subset_out_weight - subset_in_weight)) {
-                            canT1BeRemoved = false;
-                            canT2BeRemoved = false;
                             ok = false;
                             break;
                         }
@@ -1652,21 +1621,14 @@ namespace PetriEngine {
                         continue;
                     }
 
-                    if (canT1BeRemoved) {
-                        // We can discard t1
-                        skipTransition(t1);
-                        _ruleL++;
-                        continueReductions = true;
-                        break;
-                    } else if (canT2BeRemoved) {
-                        // We can discard t2
-                        skipTransition(t2);
-                        _ruleL++;
-                        continueReductions = true;
-                    }
-
+                    // We can discard t1
+                    skipTransition(t1);
+                    _ruleL++;
+                    continueReductions = true;
+                    break;
                 }
-
+                // If t1 was reduced away, we need to break out further.
+                if (tran1.skip) break;
             }
         }
 
