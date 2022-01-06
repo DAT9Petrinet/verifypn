@@ -1908,7 +1908,7 @@ namespace PetriEngine {
                     continue;
                 }
 
-                auto outArc = getOutArc(tran, p);
+                const auto & outArc = getOutArc(tran, p);
 
                 if (outArc != tran.post.end()) {
 
@@ -1939,13 +1939,13 @@ namespace PetriEngine {
 
             std::set<uint32_t> alwaysInhibited;
 
-            std::vector<uint32_t> consumersProxy = place.consumers;
+            const std::vector<uint32_t> consumersProxy = place.consumers;
             for (uint32_t cons : consumersProxy)
             {
                 if (_tflags[cons] == 1) continue;
 
                 Transition& tran = getTransition(cons);
-                auto inArc = getInArc(p, tran);
+                const auto & inArc = getInArc(p, tran);
 
                 if (inArc->weight <= low)
                 {
@@ -1956,7 +1956,7 @@ namespace PetriEngine {
                     }
                     else
                     {
-                        auto outArc = getOutArc(tran, p);
+                        const auto & outArc = getOutArc(tran, p);
                         if (inArc->weight == outArc->weight)
                         {
                             skipOutArc(cons, p);
@@ -1989,7 +1989,7 @@ namespace PetriEngine {
                     for(auto t : place.consumers)
                     {
                         std::string tname = getTransitionName(t);
-                        const ArcIter arc = getInArc(p, getTransition(t));
+                        const auto & arc = getInArc(p, getTransition(t));
                         _extraconsume[tname].emplace_back(getPlaceName(p), arc->weight);
                     }
                 }
