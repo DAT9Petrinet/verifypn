@@ -2187,10 +2187,8 @@ namespace PetriEngine {
                     continue;
                 }
 
-
                 // Combine producer with the consumers
-                auto consumers = place.consumers;
-                for (auto con_id : consumers)
+                for (auto con_id : place.consumers)
                 {
                     // Create new transition with effect of firing the producer and then the consumer
                     auto id = parent->_transitions.size();
