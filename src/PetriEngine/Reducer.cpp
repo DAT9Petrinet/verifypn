@@ -1900,7 +1900,7 @@ namespace PetriEngine {
             for (uint32_t cons : place.consumers)
             {
                 Transition& tran = getTransition(cons);
-                auto inArc = getInArc(p, tran);
+                const auto & inArc = getInArc(p, tran);
 
                 if (inArc->inhib)
                 {
@@ -1939,6 +1939,7 @@ namespace PetriEngine {
 
             std::set<uint32_t> alwaysInhibited;
 
+            // Copy of the vector to iterate over while removing from the original without invalidating the loop
             const std::vector<uint32_t> consumersProxy = place.consumers;
             for (uint32_t cons : consumersProxy)
             {
@@ -1979,16 +1980,16 @@ namespace PetriEngine {
             inhibArcs -= alwaysInhibited.size();
             _ruleN += alwaysInhibited.size();
 
-            for (auto inhibited : alwaysInhibited)
+            for (const auto & inhibited : alwaysInhibited)
                 skipTransition(inhibited);
 
             if (applyF && removePlace && inhibArcs == 0 && disableableNonNegative == 0 && numberofplaces - _skippedPlaces > 1)
             {
                 if(reconstructTrace)
                 {
-                    for(auto t : place.consumers)
+                    for(const auto & t : place.consumers)
                     {
-                        std::string tname = getTransitionName(t);
+                        const std::string & tname = getTransitionName(t);
                         const auto & arc = getInArc(p, getTransition(t));
                         _extraconsume[tname].emplace_back(getPlaceName(p), arc->weight);
                     }
