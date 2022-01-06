@@ -2031,7 +2031,7 @@ namespace PetriEngine {
             {
                 if (i < tran.pre.size() && (j == tran.post.size() || tran.pre[i] < tran.post[j]))
                 {
-                    Arc& prearc = tran.pre[i];
+                    const Arc& prearc = tran.pre[i];
                     uint32_t n = parent->initialMarking[prearc.place] / prearc.weight;
                     if (n == 0 ||
                         parent->_places[prearc.place].inhib ||
@@ -2050,7 +2050,7 @@ namespace PetriEngine {
                 }
                 else if (j < tran.post.size() && (i == tran.pre.size() || tran.post[j] < tran.pre[i]))
                 {
-                    Arc& postarc = tran.post[j];
+                    const Arc& postarc = tran.post[j];
                     if (parent->_places[postarc.place].inhib || placeInQuery[postarc.place] > 0)
                     {
                         ok = false;
