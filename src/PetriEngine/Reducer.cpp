@@ -1736,7 +1736,7 @@ namespace PetriEngine {
             if (tran.skip)
                 continue;
             bool enabled = true;
-            for (Arc prearc : tran.pre) {
+            for (Arc& prearc : tran.pre) {
                 if (prearc.inhib != (prearc.weight > parent->initialMarking[prearc.place])) {
                     enabled = false;
                     break;
