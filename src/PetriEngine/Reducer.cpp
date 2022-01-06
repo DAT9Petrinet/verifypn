@@ -885,7 +885,8 @@ namespace PetriEngine {
         return continueReductions;
     }
     
-    bool Reducer::ReducebyRuleE(uint32_t* placeInQuery) {
+    bool Reducer::ReducebyRuleE(uint32_t* placeInQuery, bool useP) {
+        // Rule P is an extension on Rule E
         bool continueReductions = false;
         const size_t numberofplaces = parent->numberOfPlaces();
         for(uint32_t p = 0; p < numberofplaces; ++p)
@@ -893,22 +894,43 @@ namespace PetriEngine {
             if(hasTimedout()) return false;
             Place& place = parent->_places[p];
             if(place.skip) continue;
-            if(place.inhib) continue;
+            if(!useP && place.inhib) continue;
             if(place.producers.size() > place.consumers.size()) continue;
-            
-            std::set<uint32_t> notenabled;
+
             bool ok = true;
-            for(uint32_t cons : place.consumers)
+            // Check for producers without matching consumers first
+            for(uint prod : place.producers)
+            {
+                // Any producer without a matching consumer blocks this rule
+                Transition& t = getTransition(prod);
+                auto in = getInArc(p, t);
+                if(in == t.pre.end() || in->inhib)
+                {
+                    ok = false;
+                    break;
+                }
+            }
+
+            if(!ok) continue;
+
+            std::set<uint32_t> notenabled;
+            // Out of the consumers, tally up those that are initially not enabled by place
+            // Ensure all the enabled transitions that feed back into place are non-increasing on place.
+            for(uint cons : place.consumers)
             {
                 Transition& t = getTransition(cons);
                 auto in = getInArc(p, t);
                 if(in->weight <= parent->initialMarking[p])
                 {
-                    auto out = getOutArc(t, p);
-                    if(out == t.post.end() || out->place != p || out->weight >= in->weight)
-                    {
-                        ok = false;
-                        break;
+                    // This branch happening even once means notenabled.size() != consumers.size()
+                    // We already threw out all cases where in->inhib && out != t.post.end()
+                    if (!in->inhib) {
+                        auto out = getOutArc(t, p);
+                        // Only increasing loops are not ok
+                        if (out != t.post.end() && out->weight > in->weight) {
+                            ok = false;
+                            break;
+                        }
                     }
                 }               
                 else
@@ -917,40 +939,30 @@ namespace PetriEngine {
                 }
             }
             
-            if(!ok || notenabled.size() == 0) continue;
-
-            for(uint32_t prod : place.producers)
-            {
-                if(notenabled.count(prod) == 0)
-                {
-                    ok = false;
-                    break;
-                }
-                // check that producing arcs originate from transition also 
-                // consuming. If so, we know it will never fire.
-                Transition& t = getTransition(prod);
-                ArcIter it = getInArc(p, t);
-                if(it == t.pre.end())
-                {
-                    ok = false;
-                    break;
-                }
-            }
-            
-            if(!ok) continue;
-
-            _ruleE++;
-            continueReductions = true;
-          
-            if(placeInQuery[p] == 0) 
-                parent->initialMarking[p] = 0;
+            if(!ok || notenabled.empty()) continue;
             
             bool skipplace = (notenabled.size() == place.consumers.size()) && (placeInQuery[p] == 0);
-            for(uint32_t cons : notenabled)
-                skipTransition(cons);
+            bool E_used, P_used = false;
+            for(uint cons : notenabled) {
+                Transition &t = getTransition(cons);
+                auto in = getInArc(p, t);
+                if (in->inhib) {
+                    skipInArc(p, cons);
+                    P_used = true;
+                } else {
+                    skipTransition(cons);
+                    E_used = true;
+                }
+            }
 
-            if(skipplace)
+            if(skipplace) {
                 skipPlace(p);
+                E_used = true;
+            }
+
+            if (E_used) _ruleE++;
+            if (P_used) _ruleP++;
+            continueReductions = true;
 
         }
         assert(consistent());
@@ -1379,12 +1391,13 @@ namespace PetriEngine {
         for (std::size_t t = 0; t < parent->numberOfTransitions(); ++t) {
             auto transition = parent->_transitions[t];
             if (!tseen[t] && !transition.skip && !transition.inhib && transition.pre.size() == 1 &&
-                transition.post.size() == 1
-                && transition.pre[0].place == transition.post[0].place) {
+                    // Search for simple self loops outside the relevant area that could be kept to preserve liveness?
+                    transition.post.size() == 1
+                    && transition.pre[0].place == transition.post[0].place) {
                 auto p = transition.pre[0].place;
                 if (!pseen[p] && !parent->_places[p].inhib) {
                     if (parent->initialMarking[p] >= transition.pre[0].weight){
-                        //Mark the initially marked self loop as relevant.
+                        // Mark the initially marked self loop as relevant.
                         tseen[t] = true;
                         pseen[p] = true;
                         reduced |= remove_irrelevant(placeInQuery, tseen, pseen);
@@ -1392,6 +1405,7 @@ namespace PetriEngine {
                         return reduced;
                     }
                     if (transition.pre[0].weight == 1){
+                        // If a single token can enable a self loop, other consumers of that place are irrelevant to liveness
                         for (auto t2 : parent->_places[p].consumers) {
                             auto transition2 = parent->_transitions[t2];
                             if (t != t2 && !tseen[t2] && !transition2.skip) {
@@ -1450,10 +1464,10 @@ namespace PetriEngine {
 
                             if (it != trans.post.end() && it->place == arc.place) {
                                 auto it2 = trans.pre.begin();
-                                // Find the arc from place to trans we know to exist
+                                // Find the arc from place to trans we know to exist because that is how we found trans in the first place
                                 for (; it2 != trans.pre.end(); ++it2)
                                     if (it2->place >= arc.place) break;
-                                // No need for a || it2->place != arc.place condition, as trans was taken from place.consumers in the first place, so it2->place == arc.place always holds here.
+                                // No need for a || it2->place != arc.place condition because we know the loop will always break on it2->place == arc.place
                                 if (it2->inhib || it->weight >= it2->weight) continue;
                             }
                             tseen[pt] = true;
@@ -1962,6 +1976,7 @@ namespace PetriEngine {
                     if (inArc->inhib)
                     {
                         alwaysInhibited.insert(cons);
+                        continueReductions = true;
                     }
                     else
                     {
@@ -2018,39 +2033,55 @@ namespace PetriEngine {
 
     bool Reducer::ReducebyRuleQ(uint32_t* placeInQuery)
     {
+        // Fire initially enabled transitions if they are the single consumer of their preset
+
         bool continueReductions = false;
 
-        for (uint32_t baseCon = 0; baseCon < parent->numberOfTransitions(); baseCon++)
+        for (uint32_t t = 0; t < parent->numberOfTransitions(); ++t)
         {
-            if (hasTimedout())
-                return false;
+            Transition& tran = parent->_transitions[t];
 
-            if (parent->_transitions[baseCon].skip ||
-                    parent->_transitions[baseCon].inhib ||
-                    parent->_transitions[baseCon].pre.size() != 1)
-                continue;
+            if (tran.skip || tran.inhib || tran.pre.empty()) continue;
 
-            auto p = parent->_transitions[baseCon].pre[0].place;
-
-            if (placeInQuery[p] > 0 || parent->initialMarking[p] > 0)
-                continue;
-
-            const Place& place = parent->_places[p];
-
-            if (place.skip || place.inhib || place.producers.empty())
-                continue;
-
-            // Check that prod and cons are disjoint
-            const auto presize = place.producers.size();
-            const auto postsize = place.consumers.size();
+            // We take advantage of pre and post being sorted as well as the overloaded < operator to check:
+            // - Preset and postset must be disjoint
+            // - Preset and postset cannot inhibit or be in query
+            // - Preset can only have this transition in postset
+            // - How many times can we fire the transition
+            uint32_t k = 0;
             bool ok = true;
             uint32_t i = 0, j = 0;
-            while (i < presize && j < postsize)
+            while (i < tran.pre.size() || j < tran.post.size())
             {
-                if (place.producers[i] < place.consumers[j])
+                if (i < tran.pre.size() && (j == tran.post.size() || tran.pre[i] < tran.post[j]))
+                {
+                    auto prearc = tran.pre[i];
+                    uint32_t n = parent->initialMarking[prearc.place] / prearc.weight;
+                    if (n == 0 ||
+                        parent->_places[prearc.place].inhib ||
+                        placeInQuery[prearc.place] > 0 ||
+                        parent->_places[prearc.place].consumers.size() != 1)
+                    {
+                        ok = false;
+                        break;
+                    }
+                    else
+                    {
+                        if (k == 0) k = n;
+                        else k = std::min(k, n);
+                    }
                     i++;
-                else if (place.consumers[j] < place.producers[i])
+                }
+                else if (j < tran.post.size() && (i == tran.pre.size() || tran.post[j] < tran.pre[i]))
+                {
+                    auto postarc = tran.post[j];
+                    if (parent->_places[postarc.place].inhib || placeInQuery[postarc.place] > 0)
+                    {
+                        ok = false;
+                        break;
+                    }
                     j++;
+                }
                 else
                 {
                     ok = false;
@@ -2058,166 +2089,47 @@ namespace PetriEngine {
                 }
             }
 
-            if (!ok) continue;
+            if (!ok || k == 0) continue;
 
-            // Now we analyze consumers further
-            uint32_t w = 0;
-            for (auto con : place.consumers)
+            // Update initial marking
+            for (auto prearc : tran.pre)
             {
-                // Consumers may not be inhibited and only consume from p.
-                const Transition& tran = parent->_transitions[con];
-                if (tran.inhib || tran.pre.size() != 1)
-                {
-                    ok = false;
-                    break;
-                }
-
-                // Post-set of consumers may not inhibit or appear in query.
-                for (const auto arc : tran.post)
-                {
-                    if (placeInQuery[arc.place] > 0 || parent->_places[arc.place].inhib)
-                    {
-                        ok = false;
-                        break;
-                    }
-                }
-
-                // All pre arc of all consumers weights must the same weight w
-                for (const auto arc : tran.pre)
-                {
-                    if (w == 0)
-                    {
-                        w = arc.weight;
-                    }
-                    else if (w != arc.weight)
-                    {
-                        ok = false;
-                        break;
-                    }
-                }
-
-                if (!ok) break;
+                parent->initialMarking[prearc.place] -= prearc.weight * k;
+            }
+            for (auto postarc : tran.post)
+            {
+                parent->initialMarking[postarc.place] += postarc.weight * k;
             }
 
-            if (!ok) continue;
-
-            // Find producers for which we can fuse its firing with
-            // a combination of consumers
-            bool removedAll = true;
-            auto producers = place.producers;
-            for (auto prod_id : producers)
-            {
-                if (hasTimedout())
-                    return false;
-
-                Transition prod = parent->_transitions[prod_id];
-                auto prodArc = getOutArc(prod, p);
-
-                if (prodArc->weight % w != 0)
-                {
-                    removedAll = false;
-                    continue;
-                }
-
-                auto k = prodArc->weight / w;
-                auto n = place.consumers.size();
-
-                if (2 < k && 3 < n)
-                {
-                    // Too many combinations
-                    removedAll = false;
-                    continue;
-                }
-
-                // Enumerate the "n multichoose k" combinations of consumer firings
-                auto consumers = place.consumers;
-                std::vector<uint32_t> indices(k, 0);
-                while (true)
-                {
-                    // Create new transition with effect of firing the producer and a combination of consumers
-                    auto id = parent->_transitions.size();
-                    if (!_skippedTransitions.empty())
-                    {
-                        id = _skippedTransitions.back();
-                        _skippedTransitions.pop_back();
-                    }
-                    else
-                    {
-                        parent->_transitions.emplace_back();
-                        parent->_transitionnames[newTransName()] = id;
-                        parent->_transitionlocations.emplace_back(std::tuple<double, double>(0.0, 0.0));
-                    }
-                    Transition& newtran = parent->_transitions[id];
-                    newtran.skip = false;
-                    newtran.inhib = false;
-
-                    // Arcs from producer
-                    for (auto& arc : prod.pre)
-                    {
-                        newtran.addPreArc(arc);
-                    }
-                    for (auto& arc : prod.post)
-                    {
-                        if (arc.place != p)
-                        {
-                            newtran.addPostArc(arc);
-                        }
-                    }
-                    // Arcs from consumers
-                    for (auto cons_index : indices)
-                    {
-                        Transition& cons = parent->_transitions[place.consumers[cons_index]];
-                        for (auto& arc : cons.post)
-                        {
-                            newtran.addPostArc(arc);
-                        }
-                    }
-
-                    for(auto& arc : newtran.pre)
-                        parent->_places[arc.place].addConsumer(id);
-                    for(auto& arc : newtran.post)
-                        parent->_places[arc.place].addProducer(id);
-
-                    // Update indices to the next combination
-                    // https://docs.python.org/3/library/itertools.html#itertools.combinations_with_replacement
-                    int32_t mi = k - 1;
-                    for (; mi >= 0; mi--)
-                        if (indices[mi] != n - 1)
-                            break;
-                    if (mi < 0)
-                        break;
-                    uint32_t ml = indices[mi] + 1;
-                    for (uint32_t mj = mi; mj < k; mj++)
-                        indices[mj] = ml;
-                }
-
-                skipTransition(prod_id);
-                continueReductions = true;
-                _ruleQ++;
-            }
-
-            if (removedAll)
-            {
-                auto consumers = place.consumers;
-                for (auto cons_id : consumers)
-                    skipTransition(cons_id);
-
-                skipPlace(p);
-            }
-
-            consistent();
+            _ruleQ++;
+            continueReductions = true;
         }
+
         return continueReductions;
     }
 
-    bool Reducer::ReducebyRuleR(uint32_t* placeInQuery)
+    bool Reducer::ReducebyRuleR(uint32_t* placeInQuery, uint8_t rmode)
     {
+        // rmode has 4 options:
+        // 0 for normal operation
+        // 1 for a 5 second local time limit
+        // 2 for a 2x original transitions space limit
+        // 3 for only applying once after all other rules have run to exhaustion, and then applying the other rules again.
+
+        std::chrono::high_resolution_clock::time_point localTimer = std::chrono::high_resolution_clock::now();
+        int localTimeout = 5;
+        uint32_t spaceLimit = 2 * parent->originalNumberOfTransitions();
         bool continueReductions = false;
 
         for (uint32_t pid = 0; pid < parent->numberOfPlaces(); pid++)
         {
             if (hasTimedout())
                 return false;
+            if (rmode == 1 && genericTimeout(localTimer, localTimeout)) {
+                return continueReductions;
+            } else if (rmode == 2 && parent->numberOfUnskippedTransitions() > spaceLimit) {
+                return continueReductions;
+            }
 
             const Place& place = parent->_places[pid];
 
@@ -2284,6 +2196,11 @@ namespace PetriEngine {
 
                 if (hasTimedout())
                     return false;
+                if (rmode == 1 && genericTimeout(localTimer, localTimeout)) {
+                    return continueReductions;
+                } else if (rmode == 2 && parent->numberOfUnskippedTransitions() > spaceLimit) {
+                    return continueReductions;
+                }
 
                 Transition prod = parent->_transitions[prod_id];
                 auto prodArc = getOutArc(prod, pid);
@@ -2396,7 +2313,7 @@ namespace PetriEngine {
             "T-server_process_7"
     };
 
-    void Reducer::Reduce(QueryPlaceAnalysisContext& context, int enablereduction, bool reconstructTrace, int timeout, bool remove_loops, bool remove_consumers, bool next_safe, std::vector<uint32_t>& reduction) {
+    void Reducer::Reduce(QueryPlaceAnalysisContext& context, int enablereduction, bool reconstructTrace, int timeout, bool remove_loops, bool remove_consumers, bool next_safe, std::vector<uint32_t>& reduction, std::vector<uint32_t>& secondaryreductions) {
 
         this->_timeout = timeout;
         _timer = std::chrono::high_resolution_clock::now();
@@ -2405,6 +2322,7 @@ namespace PetriEngine {
         if(reconstructTrace && enablereduction >= 1 && enablereduction <= 2)
             std::cout << "Rule H disabled when a trace is requested." << std::endl;
         bool applyF = std::count(reduction.begin(), reduction.end(), 5);
+        bool useP = std::count(reduction.begin(), reduction.end(), 15);
         if (enablereduction == 2) { // for k-boundedness checking only rules A, D and H are applicable
             bool changed = true;
             while (changed && !hasTimedout()) {
@@ -2427,7 +2345,7 @@ namespace PetriEngine {
                     do { // start by rules that do not move tokens
                         changed = false;
                         while(ReducebyRuleM(context.getQueryPlaceCount())) changed = true;
-                        while(ReducebyRuleE(context.getQueryPlaceCount())) changed = true;
+                        while(ReducebyRuleE(context.getQueryPlaceCount(), useP)) changed = true;
                         while(ReducebyRuleC(context.getQueryPlaceCount())) changed = true;
                         while(ReducebyRuleN(context.getQueryPlaceCount(), applyF)) changed = true;
                         while(ReducebyRuleF(context.getQueryPlaceCount())) changed = true;
@@ -2445,7 +2363,7 @@ namespace PetriEngine {
                     { // then apply tokens moving rules
                         //while(ReducebyRuleJ(context.getQueryPlaceCount())) changed = true;
                         while(ReducebyRuleQ(context.getQueryPlaceCount())) changed = true;
-                        while(ReducebyRuleR(context.getQueryPlaceCount())) changed = true;
+                        while(ReducebyRuleR(context.getQueryPlaceCount(), 0)) changed = true;
                         while(ReducebyRuleD(context.getQueryPlaceCount())) changed = true; // For cleanup
                         while(ReducebyRuleB(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
                         while(ReducebyRuleA(context.getQueryPlaceCount())) changed = true;
@@ -2466,7 +2384,7 @@ namespace PetriEngine {
             {
                 if(next_safe)
                 {
-                    if(reduction[i] != 2 && reduction[i] != 4 && reduction[i] != 5 && reduction[i] != 16 && reduction[i] != 17)
+                    if(reduction[i] != 2 && reduction[i] != 4 && reduction[i] != 5 && reduction[i] != 16 && !(reduction[i] >= 17 && reduction[i] <= 20))
                     {
                         std::cerr << "Skipping Rule" << rnames[reduction[i]] << " due to NEXT operator in proposition" << std::endl;
                         reduction.erase(reduction.begin() + i);
@@ -2480,77 +2398,111 @@ namespace PetriEngine {
                 }
             }
             bool changed = true;
-            while(changed && !hasTimedout())
-            {
-                changed = false;
-                for(auto r : reduction)
+            bool rLastAvailable = (std::find(reduction.begin(), reduction.end(), 20) != reduction.end());
+            uint8_t lastChangeRound = 0;
+            uint8_t currentRound = 0;
+            std::vector<std::vector<uint32_t>> reductionset = {reduction, secondaryreductions};
+
+            do{
+                while((changed || rLastAvailable) && !hasTimedout())
                 {
-#ifndef NDEBUG
-                    auto c = std::chrono::high_resolution_clock::now();
-                    auto op = numberOfUnskippedPlaces();
-                    auto ot = numberOfUnskippedTransitions();
-#endif
-                    switch(r)
+                    changed = false;
+                    for(auto r : reductionset[currentRound])
                     {
-                        case 0:
-                            while(ReducebyRuleA(context.getQueryPlaceCount())) changed = true;
-                            break;
-                        case 1:
-                            while(ReducebyRuleB(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
-                            break;
-                        case 2:
-                            while(ReducebyRuleC(context.getQueryPlaceCount())) changed = true;
-                            break;
-                        case 3:
-                            while(ReducebyRuleD(context.getQueryPlaceCount())) changed = true;
-                            break;              
-                        case 4:
-                            while(ReducebyRuleE(context.getQueryPlaceCount())) changed = true;
-                            break;              
-                        case 5:
-                            while(ReducebyRuleF(context.getQueryPlaceCount())) changed = true;
-                            break;             
-                        case 6:
-                            while(ReducebyRuleG(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
-                            break;             
-                        case 7:
-                            while(ReducebyRuleH(context.getQueryPlaceCount())) changed = true;
-                            break;             
-                        case 8:
-                            while(ReducebyRuleI(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
-                            break;                            
-                        case 9:
-                            while(ReducebyRuleJ(context.getQueryPlaceCount())) changed = true;
-                            break;
-                        case 10:
-                            if (ReducebyRuleK(context.getQueryPlaceCount(), remove_consumers)) changed = true;
-                            break;
-                        case 11:
-                            if (ReducebyRuleL(context.getQueryPlaceCount())) changed = true;
-                            break;
-                        case 12:
-                            if (ReducebyRuleM(context.getQueryPlaceCount())) changed = true;
-                            break;
-                        case 13:
-                            if (ReducebyRuleN(context.getQueryPlaceCount(), applyF)) changed = true;
-                            break;
-                        case 16:
-                            if (ReducebyRuleQ(context.getQueryPlaceCount())) changed = true;
-                            break;
-                        case 17:
-                            if (ReducebyRuleR(context.getQueryPlaceCount())) changed = true;
+    #ifndef NDEBUG
+                        auto c = std::chrono::high_resolution_clock::now();
+                        auto op = numberOfUnskippedPlaces();
+                        auto ot = numberOfUnskippedTransitions();
+    #endif
+                        switch(r)
+                        {
+                            case 0:
+                                while(ReducebyRuleA(context.getQueryPlaceCount())) changed = true;
+                                break;
+                            case 1:
+                                while(ReducebyRuleB(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
+                                break;
+                            case 2:
+                                while(ReducebyRuleC(context.getQueryPlaceCount())) changed = true;
+                                break;
+                            case 3:
+                                while(ReducebyRuleD(context.getQueryPlaceCount())) changed = true;
+                                break;
+                            case 4:
+                                while(ReducebyRuleE(context.getQueryPlaceCount(), useP)) changed = true;
+                                break;
+                            case 5:
+                                while(ReducebyRuleF(context.getQueryPlaceCount())) changed = true;
+                                break;
+                            case 6:
+                                while(ReducebyRuleG(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
+                                break;
+                            case 7:
+                                while(ReducebyRuleH(context.getQueryPlaceCount())) changed = true;
+                                break;
+                            case 8:
+                                while(ReducebyRuleI(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
+                                break;
+                            case 9:
+                                while(ReducebyRuleJ(context.getQueryPlaceCount())) changed = true;
+                                break;
+                            case 10:
+                                if (ReducebyRuleK(context.getQueryPlaceCount(), remove_consumers)) changed = true;
+                                break;
+                            case 11:
+                                if (ReducebyRuleL(context.getQueryPlaceCount())) changed = true;
+                                break;
+                            case 12:
+                                if (ReducebyRuleM(context.getQueryPlaceCount())) changed = true;
+                                break;
+                            case 13:
+                                if (ReducebyRuleN(context.getQueryPlaceCount(), applyF)) changed = true;
+                                break;
+                            case 16:
+                                if (ReducebyRuleQ(context.getQueryPlaceCount())) changed = true;
+                                break;
+                            case 17:
+                                if (ReducebyRuleR(context.getQueryPlaceCount(), 0)) changed = true;
+                                break;
+                            case 18:
+                                if (ReducebyRuleR(context.getQueryPlaceCount(), 1)) changed = true;
+                                break;
+                            case 19:
+                                if (ReducebyRuleR(context.getQueryPlaceCount(), 2)) changed = true;
+                                break;
+                            case 20:
+                                if (!changed && rLastAvailable){
+                                    if (ReducebyRuleR(context.getQueryPlaceCount(), 3)){
+                                        changed = true;
+                                    } else {
+                                        rLastAvailable = false;
+                                    }
+                                }
+                                break;
+                        }
+    #ifndef NDEBUG
+                        auto end = std::chrono::high_resolution_clock::now();
+                        auto diff = std::chrono::duration_cast<std::chrono::seconds>(end - c);
+                        std::cout << "SPEND " << diff.count()  << " ON " << rnames[r] << std::endl;
+                        std::cout << "REM " << ((int)op - (int)numberOfUnskippedPlaces()) << " " << ((int)ot - (int)numberOfUnskippedTransitions()) << std::endl;
+    #endif
+                        if(hasTimedout())
                             break;
                     }
-#ifndef NDEBUG
-                    auto end = std::chrono::high_resolution_clock::now();
-                    auto diff = std::chrono::duration_cast<std::chrono::seconds>(end - c);
-                    std::cout << "SPEND " << diff.count()  << " ON " << rnames[r] << std::endl;
-                    std::cout << "REM " << ((int)op - (int)numberOfUnskippedPlaces()) << " " << ((int)ot - (int)numberOfUnskippedTransitions()) << std::endl;
-#endif
-                    if(hasTimedout())
-                        break;
+
+                    if (enablereduction == 4){
+                        if (changed){
+                            lastChangeRound = currentRound;
+                        }
+                    }
                 }
-            }
+
+                if (enablereduction == 4) {
+                    currentRound = (currentRound + 1) % 2;
+                    changed = true;
+                }
+            // If lastChangeRound == currentRound, that means nothing has changed since last time we reached that round.
+            } while (enablereduction == 4 && !hasTimedout() && lastChangeRound != currentRound);
         }
 
         return;
