@@ -1525,7 +1525,7 @@ namespace PetriEngine {
         for (size_t t1 = 0; t1 < parent->numberOfTransitions() - 1; ++t1) {
             Transition &tran1 = getTransition(t1);
             if (tran1.skip) break;
-            for (auto & t1i : tran1.pre){
+            for (const auto & t1i : tran1.pre){
                 Place &p = parent->_places[t1i.place];
                 for (uint32_t t2 : p.consumers){
                     if (hasTimedout()) return false;
