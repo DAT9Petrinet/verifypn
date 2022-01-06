@@ -1544,20 +1544,15 @@ namespace PetriEngine {
                     }
 
                     // get arcs
-                    std::vector<Arc> pre_subset;
-                    std::vector<Arc> pre_superset;
-                    std::vector<Arc> post_subset;
-                    std::vector<Arc> post_superset;
+                    std::vector<Arc> pre_subset = tran1.pre;
+                    std::vector<Arc> pre_superset = tran2.pre;
+                    std::vector<Arc> post_subset = tran1.post;
+                    std::vector<Arc> post_superset = tran2.post;
                     if (canT1BeRemoved) {
                         pre_subset = tran2.pre;
                         pre_superset = tran1.pre;
                         post_subset = tran2.post;
                         post_superset = tran1.post;
-                    } else if (canT2BeRemoved) {
-                        pre_subset = tran1.pre;
-                        pre_superset = tran2.pre;
-                        post_subset = tran1.post;
-                        post_superset = tran2.post;
                     }
 
                     bool ok = true;
