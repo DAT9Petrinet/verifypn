@@ -1663,7 +1663,7 @@ namespace PetriEngine {
         const uint8_t CAN_INC = 0x01;
         const uint8_t CAN_DEC = 0x10;
         _pflags.resize(parent->_places.size(), 0);
-        std::fill(_pflags.begin(), _tflags.end(), 0);
+        std::fill(_pflags.begin(), _pflags.end(), 0);
 
         // Use tflags to mark processed fireable transitions
         _tflags.resize(parent->_transitions.size(), 0);
