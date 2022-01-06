@@ -1535,8 +1535,9 @@ namespace PetriEngine {
                     Transition &tran2 = getTransition(t2);
                     if (tran2.skip) continue;
 
+                    // We try to remove t1 despite it being the outer loop,
+                    // because p.consumers will be invalidated anyway regardless of which one we remove.
                     bool canT1BeRemoved = tran1.pre.size() >= tran2.pre.size() && tran1.post.size() >= tran2.post.size();
-                    //bool canT2BeRemoved = tran2.pre.size() >= tran1.pre.size() && tran2.post.size() >= tran1.post.size();
 
                     if (!(canT1BeRemoved)) {
                         continue;
