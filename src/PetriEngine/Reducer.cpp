@@ -2322,20 +2322,19 @@ namespace PetriEngine {
             do
             {
                 changed = false;
+                if (!next_safe && ReducebyRuleI(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
                 while (!next_safe && ReducebyRuleA(context.getQueryPlaceCount())) changed = true;
                 while (!next_safe && ReducebyRuleB(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
+                if (ReducebyRuleM(context.getQueryPlaceCount())) changed = true;
                 while (ReducebyRuleC(context.getQueryPlaceCount())) changed = true;
                 while (!next_safe && ReducebyRuleD(context.getQueryPlaceCount())) changed = true;
-                if (ReducebyRuleM(context.getQueryPlaceCount())) changed = true;
-                while (ReducebyRuleN(context.getQueryPlaceCount(), true)) changed = true;
                 while (!next_safe && ReducebyRuleG(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
-                if (!next_safe && ReducebyRuleI(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
+                while (ReducebyRuleN(context.getQueryPlaceCount(), true)) changed = true;
 
             } while(!hasTimedout() && changed);
 
             if (!next_safe) ReducebyRuleQ(context.getQueryPlaceCount());
-            while (!next_safe && _ruleR < 100 && ReducebyRuleR(context.getQueryPlaceCount(), 1));
-            ReducebyRuleL(context.getQueryPlaceCount());
+            if (!next_safe) ReducebyRuleR(context.getQueryPlaceCount(), 1);
         }
         else
         {
