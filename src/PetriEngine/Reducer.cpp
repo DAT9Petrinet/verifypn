@@ -2326,10 +2326,10 @@ namespace PetriEngine {
                 while (!next_safe && ReducebyRuleA(context.getQueryPlaceCount())) changed = true;
                 while (!next_safe && ReducebyRuleB(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
                 if (ReducebyRuleM(context.getQueryPlaceCount())) changed = true;
-                while (ReducebyRuleC(context.getQueryPlaceCount())) changed = true;
-                while (!next_safe && ReducebyRuleD(context.getQueryPlaceCount())) changed = true;
-                while (!next_safe && ReducebyRuleG(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
-                while (ReducebyRuleN(context.getQueryPlaceCount(), true)) changed = true;
+                if (ReducebyRuleC(context.getQueryPlaceCount())) changed = true;
+                if (!next_safe && ReducebyRuleD(context.getQueryPlaceCount())) changed = true;
+                if (!next_safe && ReducebyRuleG(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
+                if (ReducebyRuleN(context.getQueryPlaceCount(), true)) changed = true;
 
             } while(!hasTimedout() && changed);
 
