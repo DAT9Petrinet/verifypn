@@ -2278,7 +2278,7 @@ namespace PetriEngine {
             "T-server_process_7"
     };
 
-    void Reducer::Reduce(QueryPlaceAnalysisContext& context, int enablereduction, bool reconstructTrace, int timeout, bool remove_loops, bool remove_consumers, bool next_safe, std::vector<uint32_t>& reduction, std::vector<uint32_t>& secondaryreductions) {
+    void Reducer::Reduce(QueryPlaceAnalysisContext& context, int enablereduction, bool reconstructTrace, int timeout, bool remove_loops, bool remove_consumers, bool all_ltl, bool next_safe, std::vector<uint32_t>& reduction, std::vector<uint32_t>& secondaryreductions) {
 
         this->_timeout = timeout;
         _timer = std::chrono::high_resolution_clock::now();
@@ -2331,7 +2331,7 @@ namespace PetriEngine {
                         while(ReducebyRuleB(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
                         while(ReducebyRuleA(context.getQueryPlaceCount())) changed = true;
                         if (ReducebyRuleQ(context.getQueryPlaceCount())) changed = true;
-                        while(ReducebyRuleR(context.getQueryPlaceCount())) changed = true; // TODO Only use on ACTL*-X
+                        while(all_ltl && ReducebyRuleR(context.getQueryPlaceCount())) changed = true;
                     }
                 } while(changed && !hasTimedout());
                 if(!next_safe && !changed)
