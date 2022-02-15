@@ -2196,6 +2196,114 @@ namespace PetriEngine {
         return continueReductions;
     }
 
+    bool Reducer::ReducebyRuleS(uint32_t* placeInQuery) {
+        bool continueReductions = false;
+
+        for (uint32_t pid = 0; pid < parent->numberOfPlaces(); pid++) {
+            if (hasTimedout())
+                return false;
+
+            const Place &place = parent->_places[pid];
+
+            if (place.skip || place.inhib || placeInQuery[pid] > 0 || place.producers.empty() ||
+                place.consumers.empty())
+                continue;
+
+            // Check that prod and cons are disjoint
+            const auto presize = place.producers.size();
+            const auto postsize = place.consumers.size();
+            bool ok = true;
+            uint32_t i = 0, j = 0;
+            while (i < presize && j < postsize) {
+                if (place.producers[i] < place.consumers[j])
+                    i++;
+                else if (place.consumers[j] < place.producers[i])
+                    j++;
+                else if(getInArc(pid, getTransition(place.consumers[j]))->weight != getOutArc(getTransition(place.consumers[j]), pid)->weight) {
+                    // Because of the weight requirements, we can tolerate overlap, UNLESS it has no effect on this place, as then this rule would apply infinitely.
+                    i++;
+                    j++;
+                } else {
+                    ok = false;
+                    break;
+                }
+            }
+
+            if (!ok) continue;
+
+            uint32_t w = getOutArc(getTransition(place.producers[0]), pid)->weight;
+            if (parent->initialMarking[pid] >= w)
+                continue;
+
+            for (const auto prod : place.producers){
+                Transition& producer = getTransition(prod);
+                if(producer.post.size() != 1 || getOutArc(producer, pid)->weight != w){
+                    ok = false;
+                    break;
+                }
+                for (const auto prearc : producer.pre){
+                    if (placeInQuery[prearc.place] > 0){
+                        ok = false;
+                        break;
+                    }
+                }
+
+                if (!ok) continue;
+            }
+
+            if (!ok) continue;
+
+            bool removedAll = true;
+            for (const auto cons : place.consumers) {
+                Transition& consumer = getTransition(cons);
+                if (getInArc(pid, consumer)->weight != w){
+                    removedAll = false;
+                    continue;
+                }
+
+                for (const auto prod : place.producers){
+                    Transition& producer = getTransition(prod);
+
+                    // Create new transition with effect of firing the producer and then the consumer
+                    auto id = parent->_transitions.size();
+                    if (!_skippedTransitions.empty())
+                    {
+                        id = _skippedTransitions.back();
+                        _skippedTransitions.pop_back();
+                    }
+                    else
+                    {
+                        parent->_transitions.emplace_back();
+                        parent->_transitionnames[newTransName()] = id;
+                        parent->_transitionlocations.emplace_back(std::tuple<double, double>(0.0, 0.0));
+                    }
+
+                    Transition& newtran = parent->_transitions[id];
+                    newtran.skip = false;
+                    newtran.inhib = false;
+
+                    // Arcs from consumer
+                    for (const auto& arc : consumer.post)
+                    {
+                        newtran.addPostArc(arc);
+                    }
+                    for (const auto& arc : consumer.pre)
+                    {
+                        if (arc.place != pid)
+                            newtran.addPreArc(arc);
+                    }
+
+                    for (const auto& arc : producer.pre){
+                        newtran.addPreArc(arc);
+                    }
+                }
+            }
+
+        }
+
+        return continueReductions;
+    }
+
     std::array tnames {
             "T-lb_balancing_receive_notification_10",
             "T-lb_balancing_receive_notification_2",
