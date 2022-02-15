@@ -2237,12 +2237,12 @@ namespace PetriEngine {
 
             for (const auto prod : place.producers){
                 Transition& producer = getTransition(prod);
-                if(producer.post.size() != 1 || getOutArc(producer, pid)->weight != w){
+                if(producer.inhib || producer.post.size() != 1 || getOutArc(producer, pid)->weight != w){
                     ok = false;
                     break;
                 }
                 for (const auto prearc : producer.pre){
-                    if (placeInQuery[prearc.place] > 0){
+                    if (parent->_places[prearc.place].inhib || placeInQuery[prearc.place] > 0){
                         ok = false;
                         break;
                     }
@@ -2253,11 +2253,19 @@ namespace PetriEngine {
 
             if (!ok) continue;
 
-            bool removedAll = true;
-            for (const auto cons : place.consumers) {
+            bool removingAll = true;
+            auto todo = place.consumers;
+            while (!todo.empty())
+            {
+                if (hasTimedout())
+                    return false;
+
+                auto cons = todo.back();
+                todo.pop_back();
+
                 Transition& consumer = getTransition(cons);
                 if (getInArc(pid, consumer)->weight != w){
-                    removedAll = false;
+                    removingAll = false;
                     continue;
                 }
 
@@ -2284,21 +2292,27 @@ namespace PetriEngine {
 
                     // Arcs from consumer
                     for (const auto& arc : consumer.post)
-                    {
                         newtran.addPostArc(arc);
-                    }
                     for (const auto& arc : consumer.pre)
-                    {
                         if (arc.place != pid)
+                            // Note that this includes inhibitors, by design.
                             newtran.addPreArc(arc);
-                    }
 
                     for (const auto& arc : producer.pre){
+                        // There shouldn't be inhibitors here, that was checked earlier
                         newtran.addPreArc(arc);
                     }
-                }
-            }
 
+
+                    for(const auto& arc : newtran.pre)
+                        parent->_places[arc.place].addConsumer(id);
+                    for(const auto& arc : newtran.post)
+                        parent->_places[arc.place].addProducer(id);
+                }
+                skipTransition(cons);
+                continueReductions = true;
+                _ruleS++;
+            }
         }
 
         return continueReductions;
