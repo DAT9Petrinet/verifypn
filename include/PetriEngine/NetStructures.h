@@ -42,12 +42,18 @@ namespace PetriEngine {
         std::vector<Arc> post;
         bool skip = false;
         bool inhib = false;
-        
+
         void addPreArc(const Arc& arc)
         {
             auto lb = std::lower_bound(pre.begin(), pre.end(), arc);
-            if(lb != pre.end() && lb->place == arc.place)
-                lb->weight += arc.weight;
+            if(lb != pre.end() && lb->place == arc.place){
+                assert(lb->inhib == arc.inhib);
+                if (lb->inhib){
+                    lb->weight = std::min(lb->weight, arc.weight);
+                } else {
+                    lb->weight += arc.weight;
+                }
+            }
             else
                 lb = pre.insert(lb, arc);
             assert(lb->weight > 0);

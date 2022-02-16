@@ -2196,7 +2196,7 @@ namespace PetriEngine {
         return continueReductions;
     }
 
-    bool Reducer::ReducebyRuleS(uint32_t* placeInQuery) {
+    bool Reducer::ReducebyRuleS(uint32_t* placeInQuery, bool remove_consumers) {
         bool continueReductions = false;
 
         for (uint32_t pid = 0; pid < parent->numberOfPlaces(); pid++) {
@@ -2242,7 +2242,9 @@ namespace PetriEngine {
                     break;
                 }
                 for (const auto prearc : producer.pre){
-                    if (parent->_places[prearc.place].inhib || placeInQuery[prearc.place] > 0){
+                    const auto preplace = parent->_places[prearc.place];
+                    // If we can remove consumers, that means we are only doing reachability, so we can do free agglomeration
+                    if (preplace.inhib || placeInQuery[prearc.place] > 0 || (!remove_consumers && preplace.consumers.size() != 1)){
                         ok = false;
                         break;
                     }
@@ -2253,7 +2255,6 @@ namespace PetriEngine {
 
             if (!ok) continue;
 
-            bool removingAll = true;
             auto todo = place.consumers;
             while (!todo.empty())
             {
@@ -2264,10 +2265,16 @@ namespace PetriEngine {
                 todo.pop_back();
 
                 Transition& consumer = getTransition(cons);
-                if (getInArc(pid, consumer)->weight != w){
-                    removingAll = false;
-                    continue;
+                for (Arc& consarc : consumer.pre){
+                    if (consarc.place == pid && consarc.weight != w){
+                        continue;
+                    } else if (consarc.inhib) {
+                        // This is only disallowed for performance, so we don't need another full pass of place.producers to ensure we don't mix consumers with inhibitors.
+                        // If support for inhibitors and consumers between the same (Transition->Place) is ever added, this rule will work with it by just removing this elseif.
+                        continue;
+                    }
                 }
+
 
                 for (const auto prod : place.producers){
                     Transition& producer = getTransition(prod);
@@ -2295,11 +2302,9 @@ namespace PetriEngine {
                         newtran.addPostArc(arc);
                     for (const auto& arc : consumer.pre)
                         if (arc.place != pid)
-                            // Note that this includes inhibitors, by design.
                             newtran.addPreArc(arc);
 
                     for (const auto& arc : producer.pre){
-                        // There shouldn't be inhibitors here, that was checked earlier
                         newtran.addPreArc(arc);
                     }
 
@@ -2313,6 +2318,18 @@ namespace PetriEngine {
                 continueReductions = true;
                 _ruleS++;
             }
+
+            if (place.consumers.empty()) {
+                if (remove_consumers){
+                    // The producers of place will become purely consuming transitions when it is gone, which can be removed in reachability queries
+                    auto transitions = place.producers;
+                    for (auto tran_id : transitions)
+                        skipTransition(tran_id);
+                }
+                skipPlace(pid);
+            }
+
+            consistent();
         }
 
         return continueReductions;
@@ -2407,7 +2424,7 @@ namespace PetriEngine {
         }
         else
         {
-            const char* rnames = "ABCDEFGHIJKLMNOPQR";
+            const char* rnames = "ABCDEFGHIJKLMNOPQRS";
             for(int i = reduction.size() - 1; i >= 0; --i)
             {
                 if(next_safe)
@@ -2487,6 +2504,9 @@ namespace PetriEngine {
                                 break;
                             case 17:
                                 while (ReducebyRuleR(context.getQueryPlaceCount())) changed = true;
+                                break;
+                            case 18:
+                                while (ReducebyRuleS(context.getQueryPlaceCount(), remove_consumers)) changed = true;
                                 break;
                         }
     #ifndef NDEBUG
