@@ -2222,7 +2222,7 @@ namespace PetriEngine {
             "T-server_process_7"
     };
 
-    void Reducer::Reduce(QueryPlaceAnalysisContext& context, int enablereduction, bool reconstructTrace, int timeout, bool remove_loops, bool remove_consumers, bool all_ltl, bool next_safe, std::vector<uint32_t>& reduction, std::vector<uint32_t>& secondaryreductions) {
+    void Reducer::Reduce(QueryPlaceAnalysisContext& context, int enablereduction, bool reconstructTrace, int timeout, bool remove_loops, bool all_reach, bool all_ltl, bool next_safe, std::vector<uint32_t>& reduction, std::vector<uint32_t>& secondaryreductions) {
 
         this->_timeout = timeout;
         _timer = std::chrono::high_resolution_clock::now();
@@ -2230,6 +2230,7 @@ namespace PetriEngine {
         this->reconstructTrace = reconstructTrace;
         if(reconstructTrace && enablereduction >= 1 && enablereduction <= 2)
             std::cout << "Rule H disabled when a trace is requested." << std::endl;
+        bool remove_consumers = all_reach;
         if (enablereduction == 2) { // for k-boundedness checking only rules A, D and H are applicable
             bool changed = true;
             while (changed && !hasTimedout()) {
@@ -2300,6 +2301,10 @@ namespace PetriEngine {
                 if(!remove_loops && (reduction[i] == 5 || reduction[i] == 12))
                 {
                     std::cerr << "Skipping Rule" << rnames[reduction[i]] << " as proposition is loop sensitive" << std::endl;
+                    reduction.erase(reduction.begin() + i);
+                }
+                if (!(all_ltl || all_reach) && reduction[i] == 17) {
+                    std::cerr << "Skipping Rule" << rnames[reduction[i]] << " as proposition is not LTL" << std::endl;
                     reduction.erase(reduction.begin() + i);
                 }
             }
