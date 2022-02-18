@@ -1880,10 +1880,10 @@ namespace PetriEngine {
                 anyRemovedByM = true;
             } else if (!place.skip) {
 
-                bool affectsBehaviour = false;
-
-                // This place can either gain or lose tokens, but it may have an upper and lower bound
+                // This place can either gain or lose tokens, but it may also have bounds
                 uint8_t low = _pflags[p] & LOW_MASK;
+
+                bool affectsBehaviour = low == 0 || (_pflags[p] & CAN_INC) != 0;
 
                 if (0 < low || (_pflags[p] & CAN_INC) == 0) {
                     for (long i = place.consumers.size() - 1; i >= 0; i--) {
@@ -1926,7 +1926,9 @@ namespace PetriEngine {
 
                         // Apply rule P
                         if ((_pflags[p] & CAN_INC) == 0) {
-                            // This place cannot gain tokens. Hence, any out-going inhibitor arc with greater
+                            // This place cannot gain tokens. Transitions that require more tokens than
+                            // the initial marking are already marked as unfireable and will be removed later.
+                            // But, any out-going inhibitor arc with greater
                             // weight than the initial marking can be removed (Rule P)
 
                             if (inArc->inhib && parent->initialMarking[0] < inArc->weight) {
