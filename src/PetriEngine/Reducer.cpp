@@ -2264,9 +2264,7 @@ else if (inhibArcs == 0)
                     do { // start by rules that do not move tokens
                         changed = false;
                         if (ReducebyRuleEFMNOP(context.getQueryPlaceCount())) changed = true;
-                        //while(ReducebyRuleEP(context.getQueryPlaceCount())) changed = true;
                         while(ReducebyRuleC(context.getQueryPlaceCount())) changed = true;
-                        while(ReducebyRuleFNO(context.getQueryPlaceCount())) changed = true;
                         while(ReducebyRuleL(context.getQueryPlaceCount())) changed = true;
                         if(!next_safe)
                         {
@@ -2374,6 +2372,9 @@ else if (inhibArcs == 0)
                                 if (ReducebyRuleL(context.getQueryPlaceCount())) changed = true;
                                 break;
                             case 12:
+                            case 13:
+                            case 14:
+                            case 15:
                                 if (ReducebyRuleEFMNOP(context.getQueryPlaceCount())) changed = true;
                                 break;
                             case 16:
