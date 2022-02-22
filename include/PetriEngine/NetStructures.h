@@ -54,8 +54,12 @@ namespace PetriEngine {
                     lb->weight += arc.weight;
                 }
             }
-            else
+            else {
                 lb = pre.insert(lb, arc);
+                if (lb->inhib)
+                    inhib = true;
+            }
+
             assert(lb->weight > 0);
         }
         
@@ -81,8 +85,10 @@ namespace PetriEngine {
         void addConsumer(uint32_t id)
         {
             auto lb = std::lower_bound(consumers.begin(), consumers.end(), id);
-            if(lb == consumers.end() || *lb != id)
+            if(lb == consumers.end() || *lb != id){
                 consumers.insert(lb, id);
+            }
+
         }
         
         void addProducer(uint32_t id)
