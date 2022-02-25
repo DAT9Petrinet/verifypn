@@ -260,7 +260,7 @@ namespace PetriEngine {
             }
         }
 
-        assert(strans == _removedTransitions);
+        //assert(strans == _removedTransitions);
 
         size_t splaces = 0;
         for(size_t i = 0; i < parent->numberOfPlaces(); ++i)
@@ -2207,7 +2207,7 @@ else if (inhibArcs == 0)
         return continueReductions;
     }
 
-    bool Reducer::ReducebyRuleS(uint32_t* placeInQuery, bool remove_consumers) {
+    bool Reducer::ReducebyRuleS(uint32_t* placeInQuery, bool remove_consumers, bool remove_loops) {
         bool continueReductions = false;
 
         for (uint32_t pid = 0; pid < parent->numberOfPlaces(); pid++) {
@@ -2242,10 +2242,9 @@ else if (inhibArcs == 0)
 
             // S2
             std::vector<bool> todo (place.consumers.size(), true);
-            // S9-10; Do we need to check?
+            // S10-11; Do we need to check?
             std::vector<bool> kIsAlwaysOne (place.consumers.size(), true);
 
-            // S1
             for (const auto prod : place.producers){
                 Transition& producer = getTransition(prod);
                 // S4, S6.2
@@ -2257,16 +2256,16 @@ else if (inhibArcs == 0)
                 uint32_t kw = getOutArc(producer, pid)->weight;
                 for (uint32_t n = 0; n < place.consumers.size(); n++) {
                     uint32_t w = getInArc(pid, getTransition(place.consumers[n]))->weight;
-                    // S8
+                    // S1, S9
                     if (parent->initialMarking[pid] >= w || kw % w != 0) {
                         todo[n] = false;
                         continue;
-                    } else {
+                    } else if (kw != w) {
                         kIsAlwaysOne[n] = false;
                     }
                 }
 
-                // S8
+                // Check if we have any qualifying consumers left
                 if (std::lower_bound(todo.begin(), todo.end(), true) == todo.end()){
                     ok = false;
                     break;
@@ -2278,8 +2277,8 @@ else if (inhibArcs == 0)
                     if (preplace.inhib || placeInQuery[prearc.place] > 0){
                         ok = false;
                         break;
-                    } else if (!remove_consumers) {
-                        // If we can remove consumers, that means we are not doing deadlock, so we can do free agglomeration which avoids this condition
+                    } else if (!remove_loops) {
+                        // If we can remove loops, that means we are not doing deadlock, so we can do free agglomeration which avoids this condition
                         // S7
                         for(const auto precons : preplace.consumers){
                             // S7; Transitions in place.producers are exempt from this check
@@ -2316,7 +2315,7 @@ else if (inhibArcs == 0)
                 if (!kIsAlwaysOne[n] && consumer.pre.size() != 1) {
                     continue;
                 }
-                // S9
+                // S10
                 if (consumer.inhib) {
                     // This is disallowed for performance, so we don't need another full pass of place.producers to ensure we don't mix consumers with inhibitors.
                     // If support for inhibitors and consumers between the same (Transition->Place) is ever added, this rule will work with "&& k[n] > 1".
@@ -2395,7 +2394,7 @@ else if (inhibArcs == 0)
 
             if (place.consumers.empty()) {
                 if (remove_consumers){
-                    // The producers of place will become purely consuming transitions when it is gone, which can be removed in reachability queries
+                    // The producers of place will become purely consuming transitions when it is gone, which can sometimes be removed
                     auto transitions = place.producers;
                     for (auto tran_id : transitions)
                         skipTransition(tran_id);
@@ -2586,7 +2585,7 @@ else if (inhibArcs == 0)
                                 while (ReducebyRuleR(context.getQueryPlaceCount())) changed = true;
                                 break;
                             case 18:
-                                while (ReducebyRuleS(context.getQueryPlaceCount(), remove_consumers)) changed = true;
+                                while (ReducebyRuleS(context.getQueryPlaceCount(), remove_consumers, remove_loops)) changed = true;
                                 break;
                         }
     #ifndef NDEBUG

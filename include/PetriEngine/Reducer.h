@@ -158,7 +158,7 @@ namespace PetriEngine {
         bool ReducebyRuleEFMNOP(uint32_t* placeInQuery);
         bool ReducebyRuleQ(uint32_t* placeInQuery);
         bool ReducebyRuleR(uint32_t* placeInQuery);
-        bool ReducebyRuleS(uint32_t *placeInQuery, bool remove_consumers);
+        bool ReducebyRuleS(uint32_t *placeInQuery, bool remove_consumers, bool remove_loops);
 
         std::optional<std::pair<std::vector<bool>, std::vector<bool>>>relevant(const uint32_t* placeInQuery, bool remove_consumers);
 
