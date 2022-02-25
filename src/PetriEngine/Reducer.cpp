@@ -2290,8 +2290,9 @@ namespace PetriEngine {
 
             if (!ok) continue;
 
-            std::vector<uint32_t> consumers = place.consumers;
-            for (uint32_t n = 0; n < consumers.size(); n++)
+            std::vector<uint32_t> originalConsumers = place.consumers;
+            std::vector<uint32_t> originalProducers = place.producers;
+            for (uint32_t n = 0; n < originalConsumers.size(); n++)
             {
                 if (hasTimedout())
                     return false;
@@ -2299,7 +2300,7 @@ namespace PetriEngine {
                     continue;
 
                 ok = true;
-                Transition& consumer = getTransition(consumers[n]);
+                Transition consumer = getTransition(originalConsumers[n]);
                 // S10
                 if (!kIsAlwaysOne[n] && consumer.pre.size() != 1) {
                     continue;
@@ -2314,8 +2315,8 @@ namespace PetriEngine {
                 if (!ok) continue;
 
                 // Update
-                for (const auto prod : place.producers){
-                    Transition& producer = getTransition(prod);
+                for (const auto prod : originalProducers){
+                    Transition producer = getTransition(prod);
                     uint32_t k = 1, w;
                     if (!kIsAlwaysOne[n]){
                         w = getInArc(pid, consumer)->weight;
@@ -2339,7 +2340,8 @@ namespace PetriEngine {
                         }
 
                         // Re-fetch the transition pointer as it might be invalidated, I think that's the issue?
-                        producer = getTransition(prod);
+                        //producer = getTransition(prod);
+                        //consumer = getTransition(consumers[n]);
                         Transition& newtran = parent->_transitions[id];
                         newtran.skip = false;
                         newtran.inhib = false;
@@ -2364,7 +2366,7 @@ namespace PetriEngine {
 
                         if (k_i != k){
                             Arc newarc = producer.post[0];
-                            newarc.weight = newarc.weight - ((k-k_i)*w);
+                            newarc.weight = (k-k_i)*w;
                             newtran.addPostArc(newarc);
                         }
 
@@ -2375,7 +2377,7 @@ namespace PetriEngine {
                             parent->_places[arc.place].addProducer(id);
                     }
                 }
-                skipTransition(consumers[n]);
+                skipTransition(originalConsumers[n]);
                 continueReductions = true;
                 _ruleS++;
             }

@@ -88,7 +88,6 @@ namespace PetriEngine {
             if(lb == consumers.end() || *lb != id){
                 consumers.insert(lb, id);
             }
-
         }
         
         void addProducer(uint32_t id)
