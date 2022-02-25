@@ -260,8 +260,6 @@ namespace PetriEngine {
             }
         }
 
-        assert(strans == _removedTransitions);
-
         size_t splaces = 0;
         for(size_t i = 0; i < parent->numberOfPlaces(); ++i)
         {
