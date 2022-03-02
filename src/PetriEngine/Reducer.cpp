@@ -2213,7 +2213,6 @@ else if (inhibArcs == 0)
         bool continueReductions = false;
 
         for (uint32_t pid = 0; pid < parent->numberOfPlaces(); pid++) {
-
             if (hasTimedout())
                 return false;
             if (parent->originalNumberOfTransitions() * 2 < numberOfUnskippedTransitions())
@@ -2314,7 +2313,6 @@ else if (inhibArcs == 0)
             }
 
             if (!ok) continue;
-
             std::vector<uint32_t> originalConsumers = place.consumers;
             std::vector<uint32_t> originalProducers = place.producers;
             for (uint32_t n = 0; n < originalConsumers.size(); n++)
@@ -2325,7 +2323,7 @@ else if (inhibArcs == 0)
                     continue;
 
                 ok = true;
-                Transition& consumer = getTransition(originalConsumers[n]);
+                Transition consumer = getTransition(originalConsumers[n]);
                 // (S8 || S11)
                 if ((!remove_loops || !kIsAlwaysOne[n]) && consumer.pre.size() != 1) {
                     continue;
@@ -2338,10 +2336,9 @@ else if (inhibArcs == 0)
                 }
 
                 if (!ok) continue;
-
                 // Update
                 for (const auto& prod : originalProducers){
-                    Transition& producer = getTransition(prod);
+                    Transition producer = getTransition(prod);
                     // w is never used unless (kIsAlwaysOne[n]) = true, so no need to initialize it to an actual value.
                     uint32_t k = 1, w = 1;
                     if (!kIsAlwaysOne[n]){
@@ -2366,8 +2363,8 @@ else if (inhibArcs == 0)
                         }
 
                         // Re-fetch the transition pointers as it might be invalidated, I think that's the issue?
-                        producer = getTransition(prod);
-                        consumer = getTransition(originalConsumers[n]);
+                        //producer = getTransition(prod);
+                        //consumer = getTransition(originalConsumers[n]);
                         Transition& newtran = parent->_transitions[id];
                         newtran.skip = false;
                         newtran.inhib = false;
@@ -2395,7 +2392,6 @@ else if (inhibArcs == 0)
                             newarc.weight = (k-k_i)*w;
                             newtran.addPostArc(newarc);
                         }
-
 
                         for(const auto& arc : newtran.pre)
                             parent->_places[arc.place].addConsumer(id);

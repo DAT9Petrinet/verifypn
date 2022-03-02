@@ -91,8 +91,7 @@ namespace PetriEngine {
             }
         }
 
-        void addProducer(uint32_t id)
-        {
+        void addProducer(uint32_t id){
             auto lb = std::lower_bound(producers.begin(), producers.end(), id);
             if(lb == producers.end() || *lb != id)
                 producers.insert(lb, id);
