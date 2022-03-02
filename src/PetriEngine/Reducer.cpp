@@ -2291,6 +2291,7 @@ else if (inhibArcs == 0)
                         break;
                     } else if (!remove_loops) {
                         // If we can remove loops, that means we are not doing deadlock, so we can do free agglomeration which avoids this condition
+
                         // S7
                         for(const auto& precons : preplace.consumers){
                             // S7; Transitions in place.producers are exempt from this check
@@ -2323,8 +2324,8 @@ else if (inhibArcs == 0)
 
                 ok = true;
                 Transition& consumer = getTransition(originalConsumers[n]);
-                // S10
-                if (!kIsAlwaysOne[n] && consumer.pre.size() != 1) {
+                // (S8 || S11)
+                if ((!remove_loops || !kIsAlwaysOne[n]) && consumer.pre.size() != 1) {
                     continue;
                 }
                 // S10
