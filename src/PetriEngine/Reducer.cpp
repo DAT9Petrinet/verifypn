@@ -2209,12 +2209,16 @@ else if (inhibArcs == 0)
         return continueReductions;
     }
 
-    bool Reducer::ReducebyRuleS(uint32_t* placeInQuery, bool remove_consumers, bool remove_loops) {
+    bool Reducer::ReducebyRuleS(uint32_t* placeInQuery, bool remove_consumers, bool remove_loops, uint32_t explosion_limiter) {
         bool continueReductions = false;
 
         for (uint32_t pid = 0; pid < parent->numberOfPlaces(); pid++) {
+
             if (hasTimedout())
                 return false;
+            if (parent->originalNumberOfTransitions() * 2 < numberOfUnskippedTransitions())
+                return false;
+
 
             const Place &place = parent->_places[pid];
 
@@ -2222,6 +2226,12 @@ else if (inhibArcs == 0)
             if (place.skip || place.inhib || placeInQuery[pid] > 0 || place.producers.empty() ||
                 place.consumers.empty())
                 continue;
+
+            // Performance consideration
+            if (place.producers.size() > explosion_limiter){
+                continueReductions = true;
+                continue;
+            }
 
             // Check that prod and cons are disjoint
             // S3
@@ -2247,7 +2257,7 @@ else if (inhibArcs == 0)
             // S10-11; Do we need to check?
             std::vector<bool> kIsAlwaysOne (place.consumers.size(), true);
 
-            for (const auto prod : place.producers){
+            for (const auto& prod : place.producers){
                 Transition& producer = getTransition(prod);
                 // S4, S6.2
                 if(producer.inhib || producer.post.size() != 1){
@@ -2273,8 +2283,8 @@ else if (inhibArcs == 0)
                     break;
                 }
 
-                for (const auto prearc : producer.pre){
-                    const auto preplace = parent->_places[prearc.place];
+                for (const auto& prearc : producer.pre){
+                    const auto& preplace = parent->_places[prearc.place];
                     // S6.3, S5.2
                     if (preplace.inhib || placeInQuery[prearc.place] > 0){
                         ok = false;
@@ -2282,7 +2292,7 @@ else if (inhibArcs == 0)
                     } else if (!remove_loops) {
                         // If we can remove loops, that means we are not doing deadlock, so we can do free agglomeration which avoids this condition
                         // S7
-                        for(const auto precons : preplace.consumers){
+                        for(const auto& precons : preplace.consumers){
                             // S7; Transitions in place.producers are exempt from this check
                             if (std::lower_bound(place.producers.begin(), place.producers.end(), precons) != place.producers.end())
                                 continue;
@@ -2312,7 +2322,7 @@ else if (inhibArcs == 0)
                     continue;
 
                 ok = true;
-                Transition consumer = getTransition(originalConsumers[n]);
+                Transition& consumer = getTransition(originalConsumers[n]);
                 // S10
                 if (!kIsAlwaysOne[n] && consumer.pre.size() != 1) {
                     continue;
@@ -2327,8 +2337,8 @@ else if (inhibArcs == 0)
                 if (!ok) continue;
 
                 // Update
-                for (const auto prod : originalProducers){
-                    Transition producer = getTransition(prod);
+                for (const auto& prod : originalProducers){
+                    Transition& producer = getTransition(prod);
                     uint32_t k = 1, w;
                     if (!kIsAlwaysOne[n]){
                         w = getInArc(pid, consumer)->weight;
@@ -2351,9 +2361,9 @@ else if (inhibArcs == 0)
                             parent->_transitionlocations.emplace_back(std::tuple<double, double>(0.0, 0.0));
                         }
 
-                        // Re-fetch the transition pointer as it might be invalidated, I think that's the issue?
-                        //producer = getTransition(prod);
-                        //consumer = getTransition(consumers[n]);
+                        // Re-fetch the transition pointers as it might be invalidated, I think that's the issue?
+                        producer = getTransition(prod);
+                        consumer = getTransition(originalConsumers[n]);
                         Transition& newtran = parent->_transitions[id];
                         newtran.skip = false;
                         newtran.inhib = false;
@@ -2521,6 +2531,7 @@ else if (inhibArcs == 0)
                 }
             }
             bool changed = true;
+            uint32_t explosion_limiter = 2;
             uint8_t lastChangeRound = 0;
             uint8_t currentRound = 0;
             std::vector<std::vector<uint32_t>> reductionset = {reduction, secondaryreductions};
@@ -2587,7 +2598,7 @@ else if (inhibArcs == 0)
                                 while (ReducebyRuleR(context.getQueryPlaceCount())) changed = true;
                                 break;
                             case 18:
-                                while (ReducebyRuleS(context.getQueryPlaceCount(), remove_consumers, remove_loops)) changed = true;
+                                if (ReducebyRuleS(context.getQueryPlaceCount(), remove_consumers, remove_loops, explosion_limiter)) changed = true;
                                 break;
                         }
     #ifndef NDEBUG
@@ -2599,6 +2610,8 @@ else if (inhibArcs == 0)
                         if(hasTimedout())
                             break;
                     }
+
+                    explosion_limiter *= 2;
 
                     if (enablereduction == 4){
                         if (changed){
