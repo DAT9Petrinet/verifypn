@@ -2254,6 +2254,7 @@ else if (inhibArcs == 0)
 
             // S2
             std::vector<bool> todo (place.consumers.size(), true);
+            bool todoAllGood = true;
             // S10-11; Do we need to check?
             std::vector<bool> kIsAlwaysOne (place.consumers.size(), true);
 
@@ -2271,6 +2272,7 @@ else if (inhibArcs == 0)
                     // S1, S9
                     if (parent->initialMarking[pid] >= w || kw % w != 0) {
                         todo[n] = false;
+                        todoAllGood = false;
                         continue;
                     } else if (kw != w) {
                         kIsAlwaysOne[n] = false;
@@ -2278,7 +2280,7 @@ else if (inhibArcs == 0)
                 }
 
                 // Check if we have any qualifying consumers left
-                if (std::lower_bound(todo.begin(), todo.end(), true) == todo.end()){
+                if (!todoAllGood && std::lower_bound(todo.begin(), todo.end(), true) == todo.end()){
                     ok = false;
                     break;
                 }
@@ -2308,7 +2310,7 @@ else if (inhibArcs == 0)
                     }
                 }
 
-                if (!ok) continue;
+                if (!ok) break;
             }
 
             if (!ok) continue;
@@ -2340,7 +2342,8 @@ else if (inhibArcs == 0)
                 // Update
                 for (const auto& prod : originalProducers){
                     Transition& producer = getTransition(prod);
-                    uint32_t k = 1, w;
+                    // w is never used unless (kIsAlwaysOne[n]) = true, so no need to initialize it to an actual value.
+                    uint32_t k = 1, w = 1;
                     if (!kIsAlwaysOne[n]){
                         w = getInArc(pid, consumer)->weight;
                         k = getOutArc(producer, pid)->weight / w;
