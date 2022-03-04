@@ -2673,12 +2673,12 @@ else if (inhibArcs == 0)
                 if (!next_safe && ReducebyRuleI(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
                 while (!next_safe && ReducebyRuleA(context.getQueryPlaceCount())) changed = true;
                 while (!next_safe && ReducebyRuleB(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
-                if (ReducebyRuleM(context.getQueryPlaceCount())) changed = true;
+                if (ReducebyRuleEFMNOP(context.getQueryPlaceCount())) changed = true;
+                if (!next_safe && all_ltl && ReducebyRuleS(context.getQueryPlaceCount(), remove_consumers, remove_loops, explosion_limit)) changed = true;
                 if (ReducebyRuleC(context.getQueryPlaceCount())) changed = true;
                 if (!next_safe && ReducebyRuleD(context.getQueryPlaceCount())) changed = true;
                 if (!next_safe && ReducebyRuleG(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
-                if (ReducebyRuleFNO(context.getQueryPlaceCount())) changed = true;
-                if (!next_safe && all_ltl && ReducebyRuleS(context.getQueryPlaceCount(), remove_consumers, remove_loops, explosion_limit)) changed = true;
+                if (!next_safe && ReducebyRuleH(context.getQueryPlaceCount())) changed = true;
 
                 explosion_limit *= 2;
 
