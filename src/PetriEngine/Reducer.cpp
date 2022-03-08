@@ -2666,26 +2666,44 @@ else if (inhibArcs == 0)
             }
         }
         else if (enablereduction == 1) {
-            bool changed = false;
-            uint32_t explosion_limit = 2;
-            do {
-                changed = false;
-                if (!next_safe && ReducebyRuleI(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
-                while (!next_safe && ReducebyRuleA(context.getQueryPlaceCount())) changed = true;
-                while (!next_safe && ReducebyRuleB(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
-                if (ReducebyRuleEFMNOP(context.getQueryPlaceCount())) changed = true;
-                if (!next_safe && all_ltl && ReducebyRuleS(context.getQueryPlaceCount(), remove_consumers, remove_loops, explosion_limit)) changed = true;
-                if (ReducebyRuleC(context.getQueryPlaceCount())) changed = true;
-                if (!next_safe && ReducebyRuleD(context.getQueryPlaceCount())) changed = true;
-                if (!next_safe && ReducebyRuleG(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
-                if (!next_safe && ReducebyRuleH(context.getQueryPlaceCount())) changed = true;
+            if (!all_ltl) {
+                // A good rule application sequence for CTL
+                bool changed = false;
+                do {
+                    changed = false;
+                    while (!next_safe && ReducebyRuleA(context.getQueryPlaceCount())) changed = true;
+                    while (!next_safe && ReducebyRuleB(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
+                    if (ReducebyRuleC(context.getQueryPlaceCount())) changed = true;
+                    if (!next_safe && ReducebyRuleD(context.getQueryPlaceCount())) changed = true;
+                    if (ReducebyRuleEFMNOP(context.getQueryPlaceCount())) changed = true;
+                    if (!next_safe && ReducebyRuleG(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
+                    if (!next_safe && ReducebyRuleH(context.getQueryPlaceCount())) changed = true;
+                    if (!next_safe && ReducebyRuleI(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
+                } while (!hasTimedout() && changed);
 
-                explosion_limit *= 2;
+            } else {
+                // A good rule application sequence of LTL
+                bool changed = false;
+                uint32_t explosion_limit = 2;
+                do {
+                    changed = false;
+                    if (!next_safe && ReducebyRuleI(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
+                    while (!next_safe && ReducebyRuleA(context.getQueryPlaceCount())) changed = true;
+                    while (!next_safe && ReducebyRuleB(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
+                    if (ReducebyRuleEFMNOP(context.getQueryPlaceCount())) changed = true;
+                    if (!next_safe && all_ltl && ReducebyRuleS(context.getQueryPlaceCount(), remove_consumers, remove_loops, explosion_limit)) changed = true;
+                    if (ReducebyRuleC(context.getQueryPlaceCount())) changed = true;
+                    if (!next_safe && ReducebyRuleD(context.getQueryPlaceCount())) changed = true;
+                    if (!next_safe && ReducebyRuleG(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
+                    if (!next_safe && ReducebyRuleH(context.getQueryPlaceCount())) changed = true;
 
-            } while(!hasTimedout() && changed);
+                    explosion_limit *= 2;
 
-            if (!next_safe) ReducebyRuleQ(context.getQueryPlaceCount());
-            if (!next_safe && all_ltl) ReducebyRuleR(context.getQueryPlaceCount());
+                } while(!hasTimedout() && changed);
+
+                if (!next_safe) ReducebyRuleQ(context.getQueryPlaceCount());
+                if (!next_safe && all_ltl) ReducebyRuleR(context.getQueryPlaceCount());
+            }
         }
         else
         {
