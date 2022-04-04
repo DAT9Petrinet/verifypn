@@ -2700,7 +2700,7 @@ else if (inhibArcs == 0)
                     while (!next_safe && ReducebyRuleA(context.getQueryPlaceCount())) changed = true;
                     while (!next_safe && ReducebyRuleB(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
                     if (ReducebyRuleEFMNOP(context.getQueryPlaceCount())) changed = true;
-                    if (!next_safe && all_ltl && ReducebyRuleS(context.getQueryPlaceCount(), remove_consumers, remove_loops, explosion_limit)) changed = true;
+                    if (!next_safe && all_ltl && ReducebyRuleS(context.getQueryPlaceCount(), remove_consumers, remove_loops, all_reach, explosion_limit)) changed = true;
                     if (ReducebyRuleC(context.getQueryPlaceCount())) changed = true;
                     if (!next_safe && ReducebyRuleD(context.getQueryPlaceCount())) changed = true;
                     if (!next_safe && ReducebyRuleG(context.getQueryPlaceCount(), remove_loops, remove_consumers)) changed = true;
