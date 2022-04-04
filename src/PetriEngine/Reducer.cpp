@@ -2494,8 +2494,9 @@ else if (inhibArcs == 0)
                     if (preplace.inhib || placeInQuery[prearc.place] > 0){
                         ok = false;
                         break;
-                    } else if (!remove_loops) {
+                    } else if (!remove_loops || !allReach) {
                         // If we can remove loops, that means we are not doing deadlock, so we can do free agglomeration which avoids this condition
+                        // If this check is safe for LTL to ignore is not checked yet.
 
                         // S7
                         for(const auto& precons : preplace.consumers){
@@ -2533,12 +2534,12 @@ else if (inhibArcs == 0)
                     continue;
                 }
                 // S10
-                if (!kIsAlwaysOne[n] || !allReach) {
+                if (!kIsAlwaysOne[n] || !remove_loops) {
                     for (const auto& conspost : consumer.post) {
                         if (!kIsAlwaysOne[n] && parent->_places[conspost.place].inhib){
                             ok = false;
                             break;
-                        } else if (!allReach && placeInQuery[conspost.place] > 0){
+                        } else if (!remove_loops && placeInQuery[conspost.place] > 0){
                             ok = false;
                             break;
                         }
