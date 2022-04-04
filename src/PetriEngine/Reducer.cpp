@@ -2535,10 +2535,13 @@ else if (inhibArcs == 0)
                 // S10
                 if (!kIsAlwaysOne[n] || !allReach) {
                     for (const auto& conspost : consumer.post) {
-                        if (!kIsAlwaysOne[n] && parent->_places[conspost.place].inhib)
-                            continue;
-                        if (!allReach && placeInQuery[conspost.place] > 0)
-                            continue;
+                        if (!kIsAlwaysOne[n] && parent->_places[conspost.place].inhib){
+                            ok = false;
+                            break;
+                        } else if (!allReach && placeInQuery[conspost.place] > 0){
+                            ok = false;
+                            break;
+                        }
                     }
                 }
 
