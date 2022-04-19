@@ -2646,6 +2646,151 @@ else if (inhibArcs == 0)
         return continueReductions;
     }
 
+    bool Reducer::ReducebyRuleCFlow(uint32_t *placeInQuery) {
+        // Rule C - Places in parallel where one accumulates tokens while the others disable their post set
+        bool continueReductions = false;
+
+        _pflags.resize(parent->_places.size(), 0);
+        std::fill(_pflags.begin(), _pflags.end(), 0);
+
+        for (uint32_t tid_outer = 0; tid_outer < parent->numberOfTransitions(); ++tid_outer) {
+            for (size_t aid_outer = 0; aid_outer < parent->_transitions[tid_outer].post.size(); ++aid_outer) {
+
+                auto pid_outer = parent->_transitions[tid_outer].post[aid_outer].place;
+                if (_pflags[pid_outer] > 0) continue;
+                _pflags[pid_outer] = 1;
+
+                if (hasTimedout()) return false;
+
+                const Place &pout = parent->_places[pid_outer];
+                if (pout.skip) continue;
+
+                for (size_t aid_inner = aid_outer + 1; aid_inner < parent->_transitions[tid_outer].post.size(); ++aid_inner) {
+                    if (pout.skip) break;
+                    auto pid_inner = parent->_transitions[tid_outer].post[aid_inner].place;
+                    if (parent->_places[pid_inner].skip) continue;
+
+                    for (size_t swp = 0; swp < 2; ++swp) {
+                        if (hasTimedout()) return false;
+                        if (parent->_places[pid_inner].skip ||
+                            parent->_places[pid_outer].skip)
+                            break;
+
+                        uint p1 = pid_outer;
+                        uint p2 = pid_inner;
+
+                        assert(p1 == p2);
+                        if (swp == 1) std::swap(p1, p2);
+
+                        if (placeInQuery[p2] > 0) continue;
+
+                        Place &place1 = parent->_places[p1];
+                        Place &place2 = parent->_places[p2];
+
+                        if (place2.producers.empty() || place1.consumers.empty()) continue;
+
+                        if (place1.consumers.size() < place2.consumers.size() ||
+                            place1.producers.size() > place2.producers.size())
+                            continue;
+
+                        bool ok = true;
+
+                        uint32_t minP1Cons = std::numeric_limits<uint32_t>::max();
+                        uint32_t maxP2Cons = 0;
+                        double maxDrainRatio = 0;
+
+                        uint32_t i = 0, j = 0;
+                        while (i < place1.consumers.size() && j < place2.consumers.size()) {
+
+                            uint32_t p1t = place1.consumers[i];
+                            uint32_t p2t = place2.consumers[j];
+
+                            if (p2t < p1t) {
+                                // place2.consumers is not a subset of place1.consumers
+                                ok = false;
+                                break;
+                            }
+
+                            Transition &tran = getTransition(p1t);
+                            const auto &p1Arc = getInArc(p1, tran);
+                            minP1Cons = std::min(minP1Cons, p1Arc->weight);
+                            i++;
+
+                            if (p2t > p1t) continue;
+
+                            const auto &p2Arc = getInArc(p2, tran);
+                            maxP2Cons = std::max(maxP2Cons, p2Arc->weight);
+                            j++;
+
+                            maxDrainRatio = std::max(maxDrainRatio, (double)p2Arc->weight / (double)p1Arc->weight);
+                        }
+
+                        if (!ok || j != place2.consumers.size()) continue;
+
+                        for ( ; i < place1.consumers.size(); i++) {
+                            Transition &tran = getTransition(place1.consumers[i]);
+                            const auto &p1Arc = getInArc(p1, tran);
+                            minP1Cons = std::min(minP1Cons, p1Arc->weight);
+                        }
+
+                        if (parent->initialMarking[p2] < parent->initialMarking[p1] * maxDrainRatio) continue;
+
+                        uint32_t maxP1Prod = 0;
+                        uint32_t minP2Prod = std::numeric_limits<uint32_t>::max();
+
+                        i = 0, j = 0;
+                        while (i < place1.producers.size() && j < place2.producers.size()) {
+
+                            uint32_t p1t = place1.producers[i];
+                            uint32_t p2t = place2.producers[j];
+
+                            if (p1t < p2t) {
+                                // place1.producers is not a subset of place2.producers
+                                ok = false;
+                                break;
+                            }
+
+                            Transition &tran = getTransition(p2t);
+                            const auto &p2Arc = getOutArc(tran, p2);
+                            minP2Prod = std::min(minP2Prod, p2Arc->weight);
+                            j++;
+
+                            if (p1t > p2t) continue;
+
+                            const auto &p1Arc = getOutArc(tran, p1);
+                            maxP1Prod = std::max(maxP1Prod, p1Arc->weight);
+                            i++;
+                        }
+
+                        if (!ok || i != place1.producers.size()) continue;
+
+                        for ( ; j < place2.consumers.size(); j++) {
+                            Transition &tran = getTransition(place2.producers[j]);
+                            const auto &p2Arc = getOutArc(tran, p2);
+                            minP2Prod = std::min(minP2Prod, p2Arc->weight);
+                        }
+
+                        double r = (double)(maxP2Cons * maxP1Prod) / (double)(minP2Prod * minP1Cons);
+                        if (r > 1.0) continue;
+
+                        continueReductions = true;
+                        _ruleC++;
+                        skipPlace(p2);
+
+                        // p2 has now been removed from tid_outer.post, so update arc indexes to not miss any places
+                        if (p2 == pid_outer) {
+                            aid_outer--;
+                            aid_inner--;
+                        } else if (p2 == pid_inner) aid_inner--;
+                        break;
+                    }
+                }
+            };
+        }
+        assert(consistent());
+        return continueReductions;
+    }
+
     std::array tnames {
             "T-lb_balancing_receive_notification_10",
             "T-lb_balancing_receive_notification_2",
