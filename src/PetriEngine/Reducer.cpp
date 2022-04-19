@@ -2679,7 +2679,7 @@ else if (inhibArcs == 0)
                         uint p1 = pid_outer;
                         uint p2 = pid_inner;
 
-                        assert(p1 == p2);
+                        assert(p1 != p2);
                         if (swp == 1) std::swap(p1, p2);
 
                         if (placeInQuery[p2] > 0) continue;
