@@ -2439,7 +2439,7 @@ else if (inhibArcs == 0)
 
             const Place &place = parent->_places[pid];
 
-            // T6/S6--1, T5/S5--1
+            // T8/S8--1, T7/S7--1
             if (place.skip || place.inhib || placeInQuery[pid] > 0 || place.producers.empty() ||
                 place.consumers.empty())
                 continue;
@@ -2450,7 +2450,7 @@ else if (inhibArcs == 0)
             }
 
             // Check that prod and cons are disjoint
-            // T2/S2
+            // T4/S4
             const auto presize = place.producers.size();
             const auto postsize = place.consumers.size();
             bool ok = true;
@@ -2468,15 +2468,15 @@ else if (inhibArcs == 0)
 
             if (!ok) continue;
 
-            // S3
+            // S5
             std::vector<bool> todo (postsize, true);
             bool todoAllGood = true;
-            // S8, S9
+            // S10, S11
             std::vector<bool> kIsAlwaysOne (postsize, true);
 
             for (const auto& prod : place.producers){
                 Transition& producer = getTransition(prod);
-                // T6/S6--2, T4/S4
+                // T8/S8--2, T6/S6
                 if(producer.inhib || producer.post.size() != 1){
                     ok = false;
                     break;
@@ -2486,7 +2486,7 @@ else if (inhibArcs == 0)
                 for (uint32_t n = 0; n < place.consumers.size(); n++) {
                     uint32_t w = getInArc(pid, getTransition(place.consumers[n]))->weight;
                     if (atomic_viable){
-                        // S1, S7
+                        // S3, S9
                         if (parent->initialMarking[pid] >= w || kw % w != 0) {
                             // Atomic is only valid for reachability without deadlock.
                             todo[n] = false;
@@ -2494,7 +2494,7 @@ else if (inhibArcs == 0)
                         } else if (kw != w) {
                             kIsAlwaysOne[n] = false;
                         }
-                    // T1, T7
+                    // T3, T9
                     } else if (parent->initialMarking[pid] >= w || kw != w) {
                         ok = false;
                         break;
@@ -2511,13 +2511,13 @@ else if (inhibArcs == 0)
 
                 for (const auto& prearc : producer.pre){
                     const auto& preplace = parent->_places[prearc.place];
-                    // T6/S6--3, T5/S5--2
+                    // T8/S8--3, T7/S7--2
                     if (preplace.inhib || placeInQuery[prearc.place] > 0){
                         ok = false;
                         break;
                     } else if (!atomic_viable) {
                         // For reachability we can do free agglomeration which avoids this condition
-                        // T3: Only transitions in place.producers are allowed in preplace.consumers.
+                        // T5: Only transitions in place.producers are allowed in preplace.consumers.
                         for(const auto& precons : preplace.consumers){
                             if (std::lower_bound(place.producers.begin(), place.producers.end(), precons) == place.producers.end()){
                                 ok = false;
@@ -2542,13 +2542,13 @@ else if (inhibArcs == 0)
 
                 ok = true;
                 Transition &consumer = getTransition(originalConsumers[n]);
-                // S8, S9
+                // S10, S11
                 if (atomic_viable && !kIsAlwaysOne[n]) {
-                    // S9
+                    // S11
                     if (consumer.pre.size() != 1){
                         continue;
                     }
-                    // S8
+                    // S10
                     for (const auto& conspost : consumer.post) {
                         if (!kIsAlwaysOne[n] && parent->_places[conspost.place].inhib){
                             ok = false;
