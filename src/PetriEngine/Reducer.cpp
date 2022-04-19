@@ -2874,12 +2874,12 @@ else if (inhibArcs == 0)
         }
         else
         {
-            const char* rnames = "ABCDEFGHIJKLMNOPQRS";
+            const char* rnames = "ABCDEFGHIJKLMNOPQRSC";
             for(int i = reduction.size() - 1; i >= 0; --i)
             {
                 if(next_safe)
                 {
-                    if(reduction[i] != 2 && reduction[i] != 4 && reduction[i] != 5)
+                    if(reduction[i] != 2 && reduction[i] != 4 && reduction[i] != 5 && reduction[i] != 19)
                     {
                         std::cerr << "Skipping Rule" << rnames[reduction[i]] << " due to NEXT operator in proposition" << std::endl;
                         reduction.erase(reduction.begin() + i);
@@ -2969,6 +2969,9 @@ else if (inhibArcs == 0)
                                 break;
                             case 18:
                                 if (ReducebyRuleS(context.getQueryPlaceCount(), remove_consumers, remove_loops, all_reach, explosion_limiter)) changed = true;
+                                break;
+                            case 19:
+                                if (ReducebyRuleCFlow(context.getQueryPlaceCount())) changed = true;
                                 break;
                         }
     #ifndef NDEBUG

@@ -331,7 +331,7 @@ bool options_t::parse(int argc, const char** argv) {
                     std::vector<std::string> q2 = explode(argv[++i]);
                     for (auto& qn : q2) {
                         int32_t n;
-                        if (sscanf(qn.c_str(), "%d", &n) != 1 || n < 0 || n > 18) {
+                        if (sscanf(qn.c_str(), "%d", &n) != 1 || n < 0 || n > 19) {
                             throw base_error("Error in reduction rule choice ", std::quoted(qn));
                         } else {
                             secondaryreductions.push_back(n);
