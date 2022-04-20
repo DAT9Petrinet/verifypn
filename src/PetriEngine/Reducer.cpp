@@ -2518,15 +2518,22 @@ else if (inhibArcs == 0)
                     } else if (!atomic_viable) {
                         // For reachability we can do free agglomeration which avoids this condition
                         // T5: Only transitions in place.producers are allowed in preplace.consumers.
-                        for(const auto& precons : preplace.consumers){
-                            if (std::lower_bound(place.producers.begin(), place.producers.end(), precons) == place.producers.end()){
-                                ok = false;
-                                break;
+                        for(const uint32_t precons : preplace.consumers){
+                            for(const uint32_t valid_prod : place.producers){
+                                if (precons == valid_prod){
+                                    // ok remains true
+                                    break;
+                                } else if (precons < valid_prod){
+                                    // makes use of place.producers being ordered.
+                                    ok = false;
+                                    break;
+                                }
                             }
+                            if (!ok) break;
                         }
                     }
+                    if (!ok) break;
                 }
-
                 if (!ok) break;
             }
 
