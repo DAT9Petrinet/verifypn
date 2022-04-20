@@ -2532,6 +2532,10 @@ else if (inhibArcs == 0)
                                 break;
                             }
                         }
+                        if (i < preplace.consumers.size()){
+                            // In case the while was exited by reaching the end of place.producers 
+                            ok = false;
+                        }
                     }
                     if (!ok) break;
                 }
