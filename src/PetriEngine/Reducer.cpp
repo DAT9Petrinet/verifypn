@@ -2695,8 +2695,6 @@ else if (inhibArcs == 0)
 
                         bool ok = true;
 
-                        uint32_t minP1Cons = std::numeric_limits<uint32_t>::max();
-                        uint32_t maxP2Cons = 0;
                         double maxDrainRatio = 0;
 
                         uint32_t i = 0, j = 0;
@@ -2711,32 +2709,23 @@ else if (inhibArcs == 0)
                                 break;
                             }
 
+                            i++;
+                            if (p2t > p1t) {
+                                swp = 2; // We can't remove p1, so don't swap
+                                continue;
+                            }
+                            j++;
+
                             Transition &tran = getTransition(p1t);
                             const auto &p1Arc = getInArc(p1, tran);
-                            minP1Cons = std::min(minP1Cons, p1Arc->weight);
-                            i++;
-
-                            if (p2t > p1t) continue;
-
                             const auto &p2Arc = getInArc(p2, tran);
-                            maxP2Cons = std::max(maxP2Cons, p2Arc->weight);
-                            j++;
 
                             maxDrainRatio = std::max(maxDrainRatio, (double)p2Arc->weight / (double)p1Arc->weight);
                         }
 
                         if (!ok || j != place2.consumers.size()) continue;
 
-                        for ( ; i < place1.consumers.size(); i++) {
-                            Transition &tran = getTransition(place1.consumers[i]);
-                            const auto &p1Arc = getInArc(p1, tran);
-                            minP1Cons = std::min(minP1Cons, p1Arc->weight);
-                        }
-
                         if (parent->initialMarking[p2] < parent->initialMarking[p1] * maxDrainRatio) continue;
-
-                        uint32_t maxP1Prod = 0;
-                        uint32_t minP2Prod = std::numeric_limits<uint32_t>::max();
 
                         i = 0, j = 0;
                         while (i < place1.producers.size() && j < place2.producers.size()) {
@@ -2750,28 +2739,24 @@ else if (inhibArcs == 0)
                                 break;
                             }
 
+                            j++;
+                            if (p1t > p2t) {
+                                swp = 2; // We can't remove p1, so don't swap
+                                continue;
+                            }
+                            i++;
+
                             Transition &tran = getTransition(p2t);
                             const auto &p2Arc = getOutArc(tran, p2);
-                            minP2Prod = std::min(minP2Prod, p2Arc->weight);
-                            j++;
-
-                            if (p1t > p2t) continue;
-
                             const auto &p1Arc = getOutArc(tran, p1);
-                            maxP1Prod = std::max(maxP1Prod, p1Arc->weight);
-                            i++;
+
+                            if (maxDrainRatio > (double)p2Arc->weight / (double)p1Arc->weight) {
+                                ok = false;
+                                break;
+                            }
                         }
 
                         if (!ok || i != place1.producers.size()) continue;
-
-                        for ( ; j < place2.consumers.size(); j++) {
-                            Transition &tran = getTransition(place2.producers[j]);
-                            const auto &p2Arc = getOutArc(tran, p2);
-                            minP2Prod = std::min(minP2Prod, p2Arc->weight);
-                        }
-
-                        double r = (double)(maxP2Cons * maxP1Prod) / (double)(minP2Prod * minP1Cons);
-                        if (r > 1.0) continue;
 
                         continueReductions = true;
                         _ruleC++;
