@@ -757,7 +757,7 @@ namespace PetriEngine {
                         break;
                     }
                 }
-            };
+            }
         }
         assert(consistent());
         return continueReductions;
