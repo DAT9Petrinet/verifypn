@@ -2713,12 +2713,12 @@ else if (inhibArcs == 0)
         }
         else
         {
-            const char* rnames = "ABCDEFGHIJKLMNOPQRSC";
+            const char* rnames = "ABCDEFGHIJKLMNOPQRS";
             for(int i = reduction.size() - 1; i >= 0; --i)
             {
                 if(next_safe)
                 {
-                    if(reduction[i] != 2 && reduction[i] != 4 && reduction[i] != 5 && reduction[i] != 19)
+                    if(reduction[i] != 2 && reduction[i] != 4 && reduction[i] != 5)
                     {
                         std::cerr << "Skipping Rule" << rnames[reduction[i]] << " due to NEXT operator in proposition" << std::endl;
                         reduction.erase(reduction.begin() + i);
